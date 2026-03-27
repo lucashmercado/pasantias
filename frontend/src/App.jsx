@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
+//Pagina de construcción
+import UnderConstructionPage from './pages/placeholder/UnderConstructionPage';
+
 // Páginas públicas
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -54,7 +57,8 @@ function AppRoutes() {
 
       {/* Alumno / Egresado */}
       <Route path="/ofertas" element={
-        <ProtectedRoute roles={['alumno', 'egresado']}><OfertasPage /></ProtectedRoute>
+        // <ProtectedRoute roles={['alumno', 'egresado']}><OfertasPage /></ProtectedRoute>
+         <ProtectedRoute roles={['alumno', 'egresado']}><UnderConstructionPage /></ProtectedRoute>
       } />
       <Route path="/ofertas/:id" element={
         <ProtectedRoute roles={['alumno', 'egresado']}><OfertaDetallePage /></ProtectedRoute>
@@ -93,7 +97,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <TopBanner />
-        <Navbar />
+        {/* <Navbar /> */}
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
