@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import MessageModal from '../../components/MessageModal';
@@ -12,6 +12,18 @@ export default function LoginPage() {
   const [showMessage, setShowMessage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Buscamos si hay un email guardado en localStorage para autocompletar el campo y marcar "Recordarme"
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setForm((prev) => ({
+        ...prev,
+        email: savedEmail,
+        remember: true, // También marcamos el checkbox para que sepa que está activo
+      }));
+    }
+  }, []);
+
   //funcion para abrir el modal
   const handleConstructionMessage = (e) => {
     e.preventDefault();
@@ -20,7 +32,7 @@ export default function LoginPage() {
 
   //Nuevo Abril
   const handleBack = () => {
-    navigate(-1);
+    navigate("/");
   }
 
   // const handleChange = (e) =>
@@ -41,6 +53,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const usuario = await login(form.email, form.password);
+
+      // --- LÓGICA DE RECORDARME ---
+      if (form.remember) {
+        localStorage.setItem('rememberedEmail', form.email);
+      } else {
+        localStorage.removeItem('rememberedEmail');
+      }
+      // ----------------------------
+
       if (usuario.rol === 'admin') navigate('/admin');
       else if (usuario.rol === 'empresa') navigate('/empresa');
       else navigate('/ofertas');

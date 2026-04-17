@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import UnderConstructionPage from './pages/placeholder/UnderConstructionPage';
 
 // Páginas públicas
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -32,7 +33,7 @@ import TopBanner from './components/TopBanner';
 const ProtectedRoute = ({ children, roles }) => {
   const { usuario, loading } = useAuth();
   if (loading) return <div style={{ textAlign: 'center', padding: '4rem' }}>Cargando...</div>;
-  if (!usuario) return <Navigate to="/login" replace />;
+  if (!usuario) return <Navigate to="/" replace />;
   if (roles && !roles.includes(usuario.rol)) return <Navigate to="/" replace />;
   return children;
 };
@@ -41,19 +42,19 @@ function AppRoutes() {
   const { usuario } = useAuth();
   return (
     <Routes>
+      {/* Redirección raíz según rol */}
+      <Route path="/" element={
+        !usuario ? <HomePage />
+        : usuario.rol === 'admin' ? <Navigate to="/admin" replace />
+        : usuario.rol === 'empresa' ? <Navigate to="/empresa" replace />
+        : <Navigate to="/ofertas" replace />
+      } />
+
       {/* Públicas */}
       <Route path="/login" element={!usuario ? <LoginPage /> : <Navigate to="/" replace />} />
       <Route path="/register" element={!usuario ? <RegisterPage /> : <Navigate to="/" replace />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-
-      {/* Redirección raíz según rol */}
-      <Route path="/" element={
-        !usuario ? <Navigate to="/login" replace />
-        : usuario.rol === 'admin' ? <Navigate to="/admin" replace />
-        : usuario.rol === 'empresa' ? <Navigate to="/empresa" replace />
-        : <Navigate to="/ofertas" replace />
-      } />
 
       {/* Alumno / Egresado */}
       <Route path="/ofertas" element={
@@ -97,7 +98,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <TopBanner />
-        {/* <Navbar /> */}
+        <Navbar />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
