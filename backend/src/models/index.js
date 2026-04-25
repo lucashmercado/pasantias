@@ -1,39 +1,80 @@
+/**
+ * models/index.js — Inicialización y asociaciones de los modelos Sequelize.
+ *
+ * Changelog:
+ * - v1.2: EmpresaUsuario (equipo de reclutadores)
+ * - v1.3: Aval (avales de profesores), Mensaje (chat directo)
+ *         Notificacion añade prioridad, tipoVisual, accionURL
+ * - v1.4: ActivityLog (auditoría de acciones del sistema)
+ */
+
 'use strict';
 const sequelize = require('../config/database');
 
-const Usuario     = require('./usuario.model')(sequelize);
-const Perfil      = require('./perfil.model')(sequelize);
-const Empresa     = require('./empresa.model')(sequelize);
-const Oferta      = require('./oferta.model')(sequelize);
-const Postulacion = require('./postulacion.model')(sequelize);
-const Notificacion= require('./notificacion.model')(sequelize);
+// ── Inicialización de modelos ─────────────────────────────────────────────────
+const Usuario        = require('./usuario.model')(sequelize);
+const Perfil         = require('./perfil.model')(sequelize);
+const Empresa        = require('./empresa.model')(sequelize);
+const Oferta         = require('./oferta.model')(sequelize);
+const Postulacion    = require('./postulacion.model')(sequelize);
+const Notificacion   = require('./notificacion.model')(sequelize);
+const EmpresaUsuario = require('./empresaUsuario.model')(sequelize);
+const Aval           = require('./aval.model')(sequelize);
+const Mensaje        = require('./mensaje.model')(sequelize);
+const ActivityLog    = require('./activityLog.model')(sequelize);  // v1.4
 
-// ── Asociaciones ──────────────────────────────────────────────────────────────
-
-// Usuario <-> Perfil (1:1)
+// ── Asociaciones — Perfil ─────────────────────────────────────────────────────
 Usuario.hasOne(Perfil, { foreignKey: 'usuarioId', as: 'perfil', onDelete: 'CASCADE' });
 Perfil.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
-// Usuario <-> Empresa (1:1)
+// ── Asociaciones — Empresa ────────────────────────────────────────────────────
 Usuario.hasOne(Empresa, { foreignKey: 'usuarioId', as: 'empresa', onDelete: 'CASCADE' });
 Empresa.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
-// Empresa <-> Oferta (1:N)
+// ── Asociaciones — Oferta ─────────────────────────────────────────────────────
 Empresa.hasMany(Oferta, { foreignKey: 'empresaId', as: 'ofertas', onDelete: 'CASCADE' });
 Oferta.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 
-// Usuario <-> Postulacion (1:N)
+// ── Asociaciones — Postulacion ────────────────────────────────────────────────
 Usuario.hasMany(Postulacion, { foreignKey: 'usuarioId', as: 'postulaciones', onDelete: 'CASCADE' });
 Postulacion.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
-
-// Oferta <-> Postulacion (1:N)
 Oferta.hasMany(Postulacion, { foreignKey: 'ofertaId', as: 'postulaciones', onDelete: 'CASCADE' });
 Postulacion.belongsTo(Oferta, { foreignKey: 'ofertaId', as: 'oferta' });
 
-// Usuario <-> Notificacion (1:N)
+// ── Asociaciones — Notificacion ───────────────────────────────────────────────
 Usuario.hasMany(Notificacion, { foreignKey: 'usuarioId', as: 'notificaciones', onDelete: 'CASCADE' });
 Notificacion.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
+// ── Asociaciones — EmpresaUsuario (equipo reclutadores) ───────────────────────
+Empresa.hasMany(EmpresaUsuario, { foreignKey: 'empresaId', as: 'equipo', onDelete: 'CASCADE' });
+EmpresaUsuario.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+EmpresaUsuario.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
+Usuario.hasMany(EmpresaUsuario, { foreignKey: 'usuarioId', as: 'membresiasEmpresa', onDelete: 'CASCADE' });
+
+// ── Asociaciones — Aval (v1.3) ────────────────────────────────────────────────
+// Una Postulacion puede tener muchos Avales (de distintos profesores)
+Postulacion.hasMany(Aval, { foreignKey: 'postulacionId', as: 'avales', onDelete: 'CASCADE' });
+Aval.belongsTo(Postulacion, { foreignKey: 'postulacionId', as: 'postulacion' });
+
+// El Profesor (usuario) emite el Aval
+Usuario.hasMany(Aval, { foreignKey: 'profesorId', as: 'avalesEmitidos', onDelete: 'CASCADE' });
+Aval.belongsTo(Usuario, { foreignKey: 'profesorId', as: 'profesor' });
+
+// ── Asociaciones — Mensaje / Chat (v1.3) ──────────────────────────────────────
+// Un usuario puede haber enviado muchos mensajes
+Usuario.hasMany(Mensaje, { foreignKey: 'emisorId', as: 'mensajesEnviados', onDelete: 'CASCADE' });
+Mensaje.belongsTo(Usuario, { foreignKey: 'emisorId', as: 'emisor' });
+
+// Un usuario puede haber recibido muchos mensajes
+Usuario.hasMany(Mensaje, { foreignKey: 'receptorId', as: 'mensajesRecibidos', onDelete: 'CASCADE' });
+Mensaje.belongsTo(Usuario, { foreignKey: 'receptorId', as: 'receptor' });
+
+// ── Asociaciones — ActivityLog (v1.4) ─────────────────────────────────────────
+// Un usuario puede tener muchos registros en el log de actividad
+Usuario.hasMany(ActivityLog, { foreignKey: 'usuarioId', as: 'activityLogs', onDelete: 'SET NULL' });
+ActivityLog.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
+
+// ── Exportaciones ─────────────────────────────────────────────────────────────
 module.exports = {
   sequelize,
   Usuario,
@@ -42,4 +83,8 @@ module.exports = {
   Oferta,
   Postulacion,
   Notificacion,
+  EmpresaUsuario,   // v1.2 — equipo de reclutadores
+  Aval,             // v1.3 — avales de profesores
+  Mensaje,          // v1.3 — chat directo entre usuarios
+  ActivityLog,      // v1.4 — auditoría del sistema
 };

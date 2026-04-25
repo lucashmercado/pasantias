@@ -1,93 +1,233 @@
+/**
+ * AdminDashboardPage.jsx — Panel de Administración Institucional.
+ *
+ * Migrado al nuevo endpoint GET /api/admin/dashboard-general.
+ * Con fallback al endpoint legacy GET /api/admin/stats si el nuevo falla.
+ *
+ * Muestra:
+ *  - Tarjetas métricas: alumnos activos, empresas activas, contrataciones,
+ *    postulaciones, tasa de inserción
+ *  - Gráfico de barras con las métricas principales
+ *  - Feed de actividad reciente del sistema
+ *  - Sección de empresas pendientes de aprobación
+ *  - Sección de ofertas pendientes de moderación
+ */
+
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { adminService } from '../../services/api';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Cell,
+} from 'recharts';
+import styles from './AdminDashboardPage.module.css';
+
+/* Colores del gráfico (uno por barra) */
+const CHART_COLORS = ['#0073AD', '#27ae60', '#8e44ad', '#e67e22', '#16a085'];
+
+/* Íconos y colores para cada métrica del dashboard */
+const METRIC_DEFS = [
+  { key: 'alumnosActivos',  label: 'Alumnos Activos',   icon: '🎓', color: 'var(--primary)' },
+  { key: 'empresasActivas', label: 'Empresas Activas',   icon: '🏢', color: '#1a5276' },
+  { key: 'ofertasActivas',  label: 'Ofertas Activas',    icon: '📢', color: '#27ae60' },
+  { key: 'postulaciones',   label: 'Postulaciones',      icon: '📋', color: '#8e44ad' },
+  { key: 'contrataciones',  label: 'Contrataciones',     icon: '🤝', color: '#16a085' },
+  { key: 'tasaInsercion',   label: 'Tasa de Inserción',  icon: '📈', color: 'var(--success)', highlight: true },
+];
+
+/** Feed de actividad reciente */
+function ActividadFeed({ actividad }) {
+  if (!actividad || actividad.length === 0) return (
+    <p className="msg">No hay actividad reciente registrada.</p>
+  );
+
+  return (
+    <div className={styles.actividadList}>
+      {actividad.slice(0, 10).map((item, idx) => (
+        <div key={idx} className={styles.actividadItem}>
+          <span className={styles.actividadIcon}>{item.icono ?? '•'}</span>
+          <div className={styles.actividadBody}>
+            <span>{item.descripcion ?? item.mensaje ?? JSON.stringify(item)}</span>
+            <span className={styles.actividadFecha}>
+              {item.fecha ? new Date(item.fecha).toLocaleString('es-AR') : ''}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState(null);
+  const [stats,             setStats]            = useState(null);
+  const [actividad,         setActividad]         = useState([]);
   const [empresasPendientes, setEmpresasPendientes] = useState([]);
-  const [ofertasPendientes, setOfertasPendientes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [ofertasPendientes,  setOfertasPendientes]  = useState([]);
+  const [loading,           setLoading]          = useState(true);
+  const [error,             setError]            = useState('');
 
   const cargarDatos = async () => {
-    const [s, ep, op] = await Promise.all([
-      adminService.getStats(),
-      adminService.getEmpresasPendientes(),
-      adminService.getOfertasPendientes(),
-    ]);
-    setStats(s.data.data);
-    setEmpresasPendientes(ep.data.data);
-    setOfertasPendientes(op.data.data);
-    setLoading(false);
+    setLoading(true);
+    try {
+      // Dashboard general + actividad reciente + moderación en paralelo
+      const [dashRes, actRes, epRes, opRes] = await Promise.allSettled([
+        adminService.getDashboardGeneral(),
+        adminService.getActividadReciente(),
+        adminService.getEmpresasPendientes(),
+        adminService.getOfertasPendientes(),
+      ]);
+
+      // Dashboard general (con fallback al endpoint legacy)
+      if (dashRes.status === 'fulfilled') {
+        setStats(dashRes.value.data.data ?? dashRes.value.data);
+      } else {
+        // Fallback legacy
+        try {
+          const legacyRes = await adminService.getStats();
+          setStats(legacyRes.data.data ?? legacyRes.data);
+        } catch {
+          setError('No se pudo cargar el dashboard. Verificá la conexión con el servidor.');
+        }
+      }
+
+      if (actRes.status === 'fulfilled') {
+        setActividad(actRes.value.data.data ?? actRes.value.data ?? []);
+      }
+      if (epRes.status === 'fulfilled') {
+        setEmpresasPendientes(epRes.value.data.data ?? epRes.value.data ?? []);
+      }
+      if (opRes.status === 'fulfilled') {
+        setOfertasPendientes(opRes.value.data.data ?? opRes.value.data ?? []);
+      }
+    } catch (err) {
+      setError('Error inesperado al cargar el panel.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { cargarDatos(); }, []);
 
   const handleAprobarEmpresa = async (id) => {
     await adminService.aprobarEmpresa(id);
-    setEmpresasPendientes(empresasPendientes.filter((e) => e.id !== id));
+    setEmpresasPendientes((prev) => prev.filter((e) => e.id !== id));
   };
   const handleRechazarEmpresa = async (id) => {
     await adminService.rechazarEmpresa(id);
-    setEmpresasPendientes(empresasPendientes.filter((e) => e.id !== id));
+    setEmpresasPendientes((prev) => prev.filter((e) => e.id !== id));
   };
   const handleModerarOferta = async (id, aprobada) => {
     await adminService.moderarOferta(id, aprobada);
-    setOfertasPendientes(ofertasPendientes.filter((o) => o.id !== id));
+    setOfertasPendientes((prev) => prev.filter((o) => o.id !== id));
   };
 
-  if (loading) return <p>Cargando panel...</p>;
-
+  /* Datos para el gráfico */
   const chartData = stats ? [
-    { name: 'Usuarios', valor: stats.totalUsuarios },
-    { name: 'Empresas', valor: stats.totalEmpresas },
-    { name: 'Ofertas', valor: stats.totalOfertas },
-    { name: 'Postulaciones', valor: stats.totalPostulaciones },
-    { name: 'Contratados', valor: stats.contratados },
+    { name: 'Alumnos',       valor: stats.alumnosActivos  ?? stats.totalUsuarios   ?? 0 },
+    { name: 'Empresas',      valor: stats.empresasActivas ?? stats.totalEmpresas    ?? 0 },
+    { name: 'Ofertas',       valor: stats.ofertasActivas  ?? stats.totalOfertas     ?? 0 },
+    { name: 'Postulaciones', valor: stats.postulaciones   ?? stats.totalPostulaciones ?? 0 },
+    { name: 'Contratados',   valor: stats.contrataciones  ?? stats.contratados       ?? 0 },
   ] : [];
 
   return (
     <div className="page-container">
-      <h1>Panel de Administración</h1>
+      <div className="dashboard-header">
+        <h1>Panel de Administración</h1>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <Link to="/admin/usuarios" className="btn-primary">👥 Gestionar Usuarios</Link>
+          <Link to="/admin/logs"     className="btn-secondary">📋 Ver Logs</Link>
+        </div>
+      </div>
 
-      {/* Estadísticas */}
-      {stats && (
-        <div className="stats-grid">
-          <div className="stat-card"><span className="stat-num">{stats.totalUsuarios}</span><span>Usuarios</span></div>
-          <div className="stat-card"><span className="stat-num">{stats.totalEmpresas}</span><span>Empresas</span></div>
-          <div className="stat-card"><span className="stat-num">{stats.totalOfertas}</span><span>Ofertas</span></div>
-          <div className="stat-card"><span className="stat-num">{stats.totalPostulaciones}</span><span>Postulaciones</span></div>
-          <div className="stat-card highlight"><span className="stat-num">{stats.tasaInsercion}</span><span>Tasa de Inserción</span></div>
+      {error && <p className="error-msg" style={{ marginBottom: '1.5rem' }}>{error}</p>}
+
+      {/* ── Tarjetas métricas ───────────────────────────────────────────── */}
+      {loading ? (
+        <div className={styles.statsGrid}>
+          {METRIC_DEFS.map((m) => (
+            <div key={m.key} className={styles.skeletonCard} />
+          ))}
+        </div>
+      ) : stats && (
+        <div className={styles.statsGrid}>
+          {METRIC_DEFS.map(({ key, label, icon, color, highlight }) => {
+            const rawVal = stats[key] ?? stats[{
+              alumnosActivos:  'totalUsuarios',
+              empresasActivas: 'totalEmpresas',
+              ofertasActivas:  'totalOfertas',
+              postulaciones:   'totalPostulaciones',
+              contrataciones:  'contratados',
+              tasaInsercion:   'tasaInsercion',
+            }[key]];
+            return (
+              <div
+                key={key}
+                className={`${styles.statCard} ${highlight ? styles.highlight : ''}`}
+                style={{ '--sc': color }}
+              >
+                <span className={styles.statIcon}>{icon}</span>
+                <span className={styles.statNum}>{rawVal ?? '—'}</span>
+                <span className={styles.statLabel}>{label}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Gráfico */}
-      <div className="chart-container">
-        <h2>Estadísticas Globales</h2>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis allowDecimals={false} />
-            <Tooltip />
-            <Bar dataKey="valor" fill="#6366f1" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {/* ── Gráfico de barras ─────────────────────────────────────────────── */}
+      {!loading && chartData.length > 0 && (
+        <div className={styles.chartContainer}>
+          <h2>Métricas del sistema</h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData} barSize={40}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
+              <Tooltip
+                contentStyle={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  fontFamily: 'var(--font-primary)',
+                }}
+              />
+              <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
+                {chartData.map((_, i) => (
+                  <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
-      {/* Empresas pendientes */}
-      <section className="admin-section">
+      {/* ── Actividad reciente ─────────────────────────────────────────────── */}
+      <section className={styles.adminSection}>
+        <h2>Actividad Reciente</h2>
+        {loading ? (
+          <p className="msg">Cargando actividad...</p>
+        ) : (
+          <ActividadFeed actividad={actividad} />
+        )}
+      </section>
+
+      {/* ── Empresas pendientes ────────────────────────────────────────────── */}
+      <section className={styles.adminSection}>
         <h2>Empresas Pendientes de Aprobación ({empresasPendientes.length})</h2>
-        {empresasPendientes.length === 0 ? <p>No hay empresas pendientes.</p> : (
-          <div className="pendientes-list">
+        {empresasPendientes.length === 0 ? (
+          <p className="msg">No hay empresas pendientes. ✅</p>
+        ) : (
+          <div className={styles.pendientesList}>
             {empresasPendientes.map((e) => (
-              <div key={e.id} className="pendiente-card">
+              <div key={e.id} className={styles.pendienteCard}>
                 <div>
                   <strong>{e.razonSocial}</strong>
                   <p>{e.usuario?.nombre} {e.usuario?.apellido} — {e.usuario?.email}</p>
                 </div>
-                <div className="pendiente-actions">
-                  <button className="btn-ok" onClick={() => handleAprobarEmpresa(e.id)}>Aprobar</button>
-                  <button className="btn-danger" onClick={() => handleRechazarEmpresa(e.id)}>Rechazar</button>
+                <div className={styles.pendienteActions}>
+                  <button className="btn-ok"     onClick={() => handleAprobarEmpresa(e.id)}>✓ Aprobar</button>
+                  <button className="btn-danger" onClick={() => handleRechazarEmpresa(e.id)}>✕ Rechazar</button>
                 </div>
               </div>
             ))}
@@ -95,20 +235,22 @@ export default function AdminDashboardPage() {
         )}
       </section>
 
-      {/* Ofertas pendientes de moderación */}
-      <section className="admin-section">
+      {/* ── Ofertas pendientes ─────────────────────────────────────────────── */}
+      <section className={styles.adminSection}>
         <h2>Ofertas Pendientes de Moderación ({ofertasPendientes.length})</h2>
-        {ofertasPendientes.length === 0 ? <p>No hay ofertas pendientes.</p> : (
-          <div className="pendientes-list">
+        {ofertasPendientes.length === 0 ? (
+          <p className="msg">No hay ofertas pendientes. ✅</p>
+        ) : (
+          <div className={styles.pendientesList}>
             {ofertasPendientes.map((o) => (
-              <div key={o.id} className="pendiente-card">
+              <div key={o.id} className={styles.pendienteCard}>
                 <div>
                   <strong>{o.titulo}</strong>
                   <p>{o.empresa?.razonSocial}</p>
                 </div>
-                <div className="pendiente-actions">
-                  <button className="btn-ok" onClick={() => handleModerarOferta(o.id, true)}>Aprobar</button>
-                  <button className="btn-danger" onClick={() => handleModerarOferta(o.id, false)}>Rechazar</button>
+                <div className={styles.pendienteActions}>
+                  <button className="btn-ok"     onClick={() => handleModerarOferta(o.id, true)}>✓ Aprobar</button>
+                  <button className="btn-danger" onClick={() => handleModerarOferta(o.id, false)}>✕ Rechazar</button>
                 </div>
               </div>
             ))}

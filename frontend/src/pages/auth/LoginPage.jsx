@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import MessageModal from '../../components/MessageModal';
+import MessageModal from '../../components/MessageModal/MessageModal';
+import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -62,9 +63,10 @@ export default function LoginPage() {
       }
       // ----------------------------
 
-      if (usuario.rol === 'admin') navigate('/admin');
-      else if (usuario.rol === 'empresa') navigate('/empresa');
-      else navigate('/ofertas');
+      if (usuario.rol === 'admin')         navigate('/admin');
+      else if (usuario.rol === 'empresa')   navigate('/empresa');
+      else if (usuario.rol === 'profesor')  navigate('/profesor');
+      else                                  navigate('/dashboard'); // alumno / egresado
     } catch (err) {
       setError(err.response?.data?.message || 'Error al iniciar sesión.');
     } finally {
@@ -74,43 +76,43 @@ export default function LoginPage() {
 
   return (
    <>
-      <div className="auth-layout">
+      <div className={styles.authLayout}>
         {/* Top bar desktop */}
-        <header className="auth-topbar">
+        <header className={styles.authTopbar}>
           <button
             type="button"
-            className="auth-back"
+            className={styles.authBack}
             onClick={handleBack}
           >
-            <span className="auth-back-icon">←</span>
+            <span className={styles.authBackIcon}>←</span>
             <span>volver</span>
           </button>
 
           <img 
             src="/logo1-itb.png"
             alt="Instituto Tecnológico Beltrán"
-            className="auth-top-logo"
+            className={styles.authTopLogo}
           />
         </header>
 
-        <main className="auth-container auth-container-wireframe">
-          <div className="auth-card auth-card-wireframe">
+        <main className={`${styles.authContainer} ${styles.authContainer}`}>
+          <div className={`${styles.authCard} ${styles.authCardWireframe}`}>
             {/* Logo mobile */}
            <img
               src="/logo1-itb.png"
               alt="Instituto Tecnológico Beltrán"
-              className="auth-logo-mobile"
+              className={styles.authLogoMobile}
           />
 
-            <div className="auth-header">
-              <h1 className="auth-subtitle">Inicia Sesión</h1>
-              <p className="auth-desc">Accedé a tu cuenta</p>
-              <div className="auth-divider" />
+            <div className={styles.authHeader}>
+              <h1 className={styles.authSubtitle}>Inicia Sesión</h1>
+              <p className={styles.authDesc}>Accedé a tu cuenta</p>
+              <div className={styles.authDivider} />
             </div>
 
             <form
               onSubmit={handleSubmit}
-              className="auth-form"
+              className={styles.authForm}
             >
               <div className="form-group">
                 <label htmlFor="email">Email</label>
@@ -127,7 +129,7 @@ export default function LoginPage() {
               <div className="form-group">
                 <label htmlFor="password">Contraseña</label>
 
-                <div className="password-input-wrapper">
+                <div className={styles.passwordInputWrapper}>
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -139,7 +141,7 @@ export default function LoginPage() {
 
                   <button
                     type="button"
-                    className="password-toggle"
+                    className={styles.passwordToggle}
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={
                       showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
@@ -178,8 +180,8 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="auth-options">
-                <label className="remember-checkbox">
+              <div className={styles.authOptions}>
+                <label className={styles.rememberCheckbox}>
                   <input
                     type="checkbox"
                     name="remember"
@@ -191,7 +193,7 @@ export default function LoginPage() {
 
                 <Link
                   to="#"
-                  className="forgot-link"
+                  className={styles.forgotLink}
                   onClick={handleConstructionMessage}
                 >
                   ¿Olvidaste tu contraseña?
@@ -202,16 +204,16 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                className="btn-primary auth-submit"
+                className={`btn-primary ${styles.authSubmit}`}
                 disabled={loading}
               >
                 {loading ? 'Ingresando...' : 'INGRESAR'}
               </button>
             </form>
 
-            <div className="auth-divider auth-divider-bottom" />
+            <div className={`${styles.authDivider} ${styles.authDividerBottom}`} />
 
-            <p className="auth-link auth-register">
+            <p className={`${styles.authLink} ${styles.authRegister}`}>
               ¿No tenés cuenta?{' '}
               <Link
                 to="#"

@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ── Colores ─────────────────────────────────────────────────────────────── */
+  --primary:       #0073AD;
+  --primary-dark:  #005a87;
+  --primary-light: #e0f2fb;
+  --secondary:     #2D3E50;
+  --accent:        #58ACFA;
+  --danger:        #c0392b;
+  --warning:       #e67e22;
+  --success:       #27ae60;
+
+  /* ── Fondos ──────────────────────────────────────────────────────────────── */
+  --bg:            #f4f6f8;
+  --bg-card:       #ffffff;
+  --bg-card2:      #f0f4f7;
+
+  /* ── Bordes ──────────────────────────────────────────────────────────────── */
+  --border:        #d0dce6;
+  --radius:        8px;
+
+  /* ── Tipografías ─────────────────────────────────────────────────────────── */
+  --font-primary:  'Raleway', 'Montserrat', sans-serif;
+
+  /* ── Textos ──────────────────────────────────────────────────────────────── */
+  --text:          #222222;
+  --text-muted:    #5a6a7a;
+
+  /* ── Sombras ─────────────────────────────────────────────────────────────── */
+  --shadow:        0 2px 16px rgba(0, 115, 173, 0.10);
+  --shadow-card:   0 1px 6px rgba(45, 62, 80, 0.10);
+
+  /* ── Spacing reutilizable ────────────────────────────────────────────────── */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 2.5rem;
+}

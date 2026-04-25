@@ -1,0 +1,321 @@
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--secondary);
+  border-bottom: 3px solid var(--primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.navbarInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.navbarBrand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-decoration: none;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.navbarBrand:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.brandIcon {
+  font-size: 1.3rem;
+}
+
+/* ── Links ───────────────────────────────────────────────────────────────── */
+.navbarLinks {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex: 1;
+}
+
+.navLink {
+  padding: 0.45rem 0.9rem;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.navLink:hover {
+  color: #fff;
+  background: rgba(0, 115, 173, 0.5);
+  text-decoration: none;
+}
+
+.navLink.active {
+  color: #fff;
+  background: var(--primary);
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+.navbarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* ── Botón icono con badge (chat) ────────────────────────────────────────── */
+.iconBadgeBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  text-decoration: none;
+  transition: background 0.15s;
+  color: rgba(255,255,255,0.8);
+}
+
+.iconBadgeBtn:hover {
+  background: rgba(0, 115, 173, 0.4);
+  color: #fff;
+  text-decoration: none;
+}
+
+.iconBadgeActive { color: #fff; }
+
+/* Contador sobre el ícono */
+.iconBadgeCount {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 99px;
+  padding: 0.05rem 0.38rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  min-width: 16px;
+  text-align: center;
+  border: 1.5px solid var(--secondary);
+}
+
+/* ── Badge de notificaciones ─────────────────────────────────────────────── */
+.notifBadge {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  border-radius: 20px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--font-primary);
+}
+
+.notifBadge:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* Alta prioridad → rojo */
+.notifBadgeAlta {
+  background: #e74c3c;
+  border-color: #c0392b;
+  animation: pulse 1.8s infinite;
+}
+
+/* Normal → azul suave */
+.notifBadgeNormal {
+  background: rgba(0, 115, 173, 0.7);
+  border-color: rgba(0, 115, 173, 0.9);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+/* ── User menu ───────────────────────────────────────────────────────────── */
+.userMenu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.userMenu:hover {
+  background: rgba(0, 115, 173, 0.4);
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+/* Foto de perfil dentro del avatar */
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.userName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.arrow {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Dropdown ────────────────────────────────────────────────────────────── */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.15s ease;
+  z-index: 200;
+}
+
+.dropdownInfo {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.dropdownRole {
+  font-size: 0.75rem;
+  width: fit-content;
+}
+
+.dropdownLogout {
+  margin-top: 0.25rem;
+  background: #fdecea;
+  color: var(--danger);
+  border: 1px solid #f5b7b1;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--font-primary);
+  text-align: center;
+}
+
+.dropdownLogout:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* Nombre completo en el dropdown */
+.dropdownName {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+/* Divisor */
+.dropdownDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.1rem 0;
+}
+
+/* Botón de notificaciones dentro del dropdown */
+.dropdownNotif {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--font-primary);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.dropdownNotif:hover { background: #fde68a; }
+
+/* Badge urgente dentro del botón de notif */
+.dropdownUrgente {
+  background: var(--danger);
+  color: #fff;
+  border-radius: 99px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.badge-sin_experiencia, .badge-en_revision { background: #7f8c8d; }
+.badge-junior, .badge-preseleccionado      { background: #2980b9; }
+.badge-semi_senior, .badge-entrevista_programada { background: #8e44ad; }
+.badge-no_seleccionado { background: var(--danger); }
+.badge-contratado      { background: var(--success); }
+.badge-activa          { background: var(--success); }
+.badge-pausada         { background: var(--warning); }
+.badge-cerrada         { background: #7f8c8d; }
+.badge-profesor        { background: var(--primary); color: #fff; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .navbarLinks {
+    display: none;
+  }
+
+  .userName {
+    display: none;
+  }
+}

@@ -1,0 +1,95 @@
+/* ── PerfilPage ──────────────────────────────────────────────────────────── */
+
+/* Barra de completitud */
+.completitudBar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.25rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-card);
+}
+
+.completitudHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--secondary);
+  margin-bottom: 0.5rem;
+}
+
+.progressTrack {
+  height: 8px;
+  background: var(--bg-card2);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
+/* ── Secciones del formulario ────────────────────────────────────────────── */
+.formSection {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--secondary);
+  border-left: 3px solid var(--primary);
+  padding-left: 0.75rem;
+  margin: 0 0 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sectionIcon {
+  font-size: 1.1rem;
+}
+
+/* ── Feedback de guardado ────────────────────────────────────────────────── */
+.msgOk {
+  color: #1a7a4a;
+  background: #d5f5e3;
+  border: 1px solid #a9dfbf;
+  border-radius: var(--radius);
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+/* ── CV Upload ───────────────────────────────────────────────────────────── */
+.cvUpload {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cvHint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .formSection {
+    padding: 1rem;
+  }
+}

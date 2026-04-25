@@ -1,0 +1,256 @@
+/* ── Layout Auth ─────────────────────────────────────────────────────────── */
+.authLayout {
+  min-height: 100vh;
+  background: #f3f3f3;
+}
+
+.authTopbar {
+  min-height: 72px;
+  border-bottom: 1px solid #c7c7c7;
+  background: #f3f3f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.authBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: transparent;
+  border: none;
+  color: #555;
+  font-family: var(--font-primary);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.authBack:hover {
+  color: #222;
+}
+
+.authBackIcon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.authTopLogo {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 190px;
+  max-height: 56px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.authLogoMobile {
+  display: none;
+  width: auto;
+  height: auto;
+  max-width: 180px;
+  max-height: 54px;
+  object-fit: contain;
+  margin: 0 auto 1.5rem;
+}
+
+/* ── Contenedor principal ────────────────────────────────────────────────── */
+.authContainer {
+  min-height: calc(100vh - 54px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  background: linear-gradient(135deg, #2D3E50 0%, #0073AD 60%, #58ACFA 100%);
+}
+
+.authCard {
+  width: 100%;
+  animation: fadeIn 0.4s ease;
+}
+
+.authCardWireframe {
+  max-width: 460px;
+  background: #ffffff;
+  border: 1px solid #d9e1e8;
+  border-radius: 18px;
+  padding: 2rem 2rem 2.2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+/* ── Encabezado ──────────────────────────────────────────────────────────── */
+.authHeader {
+  margin-bottom: 1.35rem;
+}
+
+.authTitle {
+  font-size: 1rem;
+  color: var(--primary);
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.authSubtitle {
+  font-size: 2.05rem;
+  font-weight: 600;
+  text-align: center;
+  margin: 0;
+  color: var(--secondary);
+}
+
+.authDesc {
+  color: var(--text-muted);
+  font-size: 0.98rem;
+  text-align: center;
+  margin: 0.55rem 0 1rem;
+  line-height: 1.4;
+}
+
+.authDivider {
+  width: 100%;
+  height: 1px;
+  background: #8d8d8d;
+}
+
+.authDividerBottom {
+  margin-top: 1rem;
+}
+
+/* ── Formulario ──────────────────────────────────────────────────────────── */
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.authLink {
+  text-align: center;
+  margin-top: 1.4rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ── Password toggle ─────────────────────────────────────────────────────── */
+.passwordInputWrapper {
+  position: relative;
+}
+
+.passwordInputWrapper input {
+  padding-right: 3rem;
+}
+
+.passwordToggle {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+}
+
+.passwordToggle svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ── Opciones (recordarme / olvidé contraseña) ───────────────────────────── */
+.authOptions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.rememberCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  color: #2f3b46;
+  cursor: pointer;
+}
+
+.rememberCheckbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid #7d8790;
+  border-radius: 3px;
+  background: #fff;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.forgotLink {
+  font-size: 0.92rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.authSubmit {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+/* ── Registro ────────────────────────────────────────────────────────────── */
+.authRegister,
+.authRegister a {
+  color: #4f5d6b;
+}
+
+.authRegister a {
+  font-weight: 700;
+}
+
+/* ── Animación ───────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .authTopbar {
+    display: none;
+  }
+
+  .authContainer {
+    padding: 2rem 1rem;
+  }
+
+  .authCardWireframe {
+    max-width: 100%;
+    padding: 1.5rem 1.25rem 1.8rem;
+    border-radius: 16px;
+  }
+
+  .authLogoMobile {
+    display: block;
+  }
+
+  .authSubtitle {
+    font-size: 1.85rem;
+  }
+
+  .authDesc {
+    font-size: 1rem;
+  }
+
+  .authOptions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.7rem;
+  }
+}

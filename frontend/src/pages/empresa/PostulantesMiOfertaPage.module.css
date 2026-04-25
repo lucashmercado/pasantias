@@ -1,0 +1,214 @@
+/* ── PostulantesMiOfertaPage.module.css ──────────────────────────────────── */
+
+/* Cabecera mejorada del candidato: nombre + badge de estado en la misma línea */
+.candidatoCard {
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 700px) {
+  .candidatoCard {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.candidatoHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+/* ── Barra de compatibilidad ─────────────────────────────────────────────── */
+.compatWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.compatLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.compatBar {
+  flex: 1;
+  height: 8px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.compatFill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+
+.compatPct {
+  font-size: 0.82rem;
+  font-weight: 800;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* ── Historial académico ─────────────────────────────────────────────────── */
+.academicBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--bg-card2);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.academicTitle {
+  font-weight: 700;
+  color: var(--secondary);
+  margin-bottom: 0.1rem;
+}
+
+/* ── Sin CV ──────────────────────────────────────────────────────────────── */
+.sinCv {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Carta de presentación ───────────────────────────────────────────────── */
+.cartaDetails {
+  margin-top: 0.5rem;
+}
+
+.cartaDetails summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.cartaDetails summary::-webkit-details-marker { display: none; }
+
+.cartaDetails p {
+  margin-top: 0.5rem;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+/* ── Etiqueta del selector de estado ─────────────────────────────────────── */
+.estadoLabel {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.35rem;
+}
+
+/* ── Barra de filtro ─────────────────────────────────────────────────────── */
+.filtroBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filtroSelect {
+  min-width: 160px;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  font-size: 0.88rem;
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+/* ── Estado vacío ────────────────────────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.emptyState span { font-size: 2.5rem; }
+
+/* ── Aval Badge (visible para la empresa) ────────────────────────────────── */
+.avalBadge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--aval-bg);
+  border: 1px solid var(--aval-border);
+  color: var(--aval-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+.avalBadge > span:first-child {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.avalBadge div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.avalBadge strong {
+  font-size: 0.84rem;
+  color: var(--aval-color);
+}
+
+.avalBadge small {
+  font-size: 0.76rem;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.avalBadge em {
+  font-size: 0.78rem;
+  font-style: italic;
+  opacity: 0.8;
+  font-weight: 400;
+  border-left: 2px solid currentColor;
+  padding-left: 0.4rem;
+  margin-top: 0.15rem;
+}

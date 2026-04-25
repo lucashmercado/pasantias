@@ -1,0 +1,379 @@
+/* ProfesorAvalesPage.module.css */
+
+/* ── Subtítulo cabecera ──────────────────────────────────────────────────── */
+.headerSubtitle {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0 0;
+}
+
+/* ── Banner de éxito ─────────────────────────────────────────────────────── */
+.successBanner {
+  background: #eafaf1;
+  border: 1px solid #a9dfbf;
+  color: #1e8449;
+  border-radius: var(--radius);
+  padding: 0.7rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Filtro tabs ─────────────────────────────────────────────────────────── */
+.filtroTabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.filtroTab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.filtroTab:hover { border-color: var(--primary); color: var(--primary); }
+
+.filtroActivo {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.filtroActivo:hover { background: var(--primary-dark, #005a8a); border-color: var(--primary-dark, #005a8a); color: #fff; }
+
+.filtroCount {
+  background: rgba(255,255,255,0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  min-width: 1.4rem;
+  text-align: center;
+}
+.filtroTab:not(.filtroActivo) .filtroCount {
+  background: var(--bg-secondary, #f0f2f4);
+  color: var(--text-muted);
+}
+
+/* ── Lista de avales ─────────────────────────────────────────────────────── */
+.avalesList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Card de aval ────────────────────────────────────────────────────────── */
+.avalCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: box-shadow 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.avalCard:hover {
+  box-shadow: 0 4px 18px rgba(0, 115, 173, 0.12);
+  transform: translateX(2px);
+}
+
+/* Cabecera de la card */
+.avalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.avalAlumno {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.avalAvatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.avalAlumno strong {
+  font-size: 0.95rem;
+  color: var(--secondary);
+  display: block;
+}
+.avalAlumno span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.estadoBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Oferta */
+.avalOferta {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+}
+.avalOferta strong { color: var(--secondary); display: block; }
+.avalOferta span   { color: var(--text-muted); font-size: 0.82rem; display: block; }
+.avalOferta small  { color: var(--text-muted); font-size: 0.76rem; display: block; margin-top: 0.1rem; }
+
+/* Mensaje del alumno */
+.avalMensajeAlumno {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+}
+.avalMensajeAlumno span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.avalMensajeAlumno p {
+  font-size: 0.86rem;
+  color: #1e3a5f;
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Comentario del profesor */
+.avalComentarioExistente {
+  background: var(--bg-secondary, #f4f6f8);
+  border-left: 3px solid var(--border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.86rem;
+}
+.avalComentarioExistente span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.avalComentarioExistente p { margin: 0; color: var(--text-primary); line-height: 1.5; }
+
+/* Pie de la card */
+.avalFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.avalFecha {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+.emptyState span { font-size: 2.8rem; }
+.emptyState p    { font-size: 0.92rem; max-width: 420px; line-height: 1.6; margin: 0; }
+
+.emptyHint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.skeletonCard {
+  height: 130px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e8edf0 25%, #f4f6f8 50%, #e8edf0 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.5);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.22s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(18px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.5rem 1.5rem 0;
+  gap: 1rem;
+}
+.modalHeader h3 { font-size: 1.1rem; margin: 0 0 0.2rem; }
+
+.modalSubtitle {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.modalCloseBtn:hover { color: var(--text-primary); }
+
+.modalBody {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Mensaje del alumno dentro del modal */
+.mensajeAlumnoBox {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 0.65rem 0.9rem;
+}
+.mensajeAlumnoLabel {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.mensajeAlumnoBox p {
+  font-size: 0.86rem;
+  color: #1e3a5f;
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Radios de estado */
+.estadoRadios {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: border-color 0.18s, background 0.18s;
+  font-family: var(--font-primary);
+}
+.radioLabel input { display: none; }
+.radioActive { font-weight: 700; }
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .avalCard   { padding: 1rem; }
+  .avalHeader { flex-direction: column; }
+  .avalFooter { flex-direction: column; align-items: flex-start; }
+  .filtroTabs { gap: 0.3rem; }
+}

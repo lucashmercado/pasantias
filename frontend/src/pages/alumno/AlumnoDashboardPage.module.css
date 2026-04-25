@@ -1,0 +1,375 @@
+/* ── AlumnoDashboardPage ─────────────────────────────────────────────────── */
+
+/* Header */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.greeting {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--secondary);
+  margin: 0 0 0.2rem;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  text-transform: capitalize;
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Metrics Grid ────────────────────────────────────────────────────────── */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.metricLink {
+  text-decoration: none;
+  display: block;
+}
+
+.metricCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-card);
+}
+
+.metricLink:hover .metricCard {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.15);
+}
+
+.metricIcon {
+  font-size: 1.6rem;
+}
+
+.metricValue {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.metricLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Profile Progress ────────────────────────────────────────────────────── */
+.perfilProgress {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+
+.perfilProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--secondary);
+  margin-bottom: 0.6rem;
+}
+
+.progressBar {
+  height: 8px;
+  background: var(--bg-card2);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.6s ease;
+}
+
+.perfilCTA {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.83rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.perfilCTA:hover {
+  text-decoration: underline;
+}
+
+/* ── Notification Banner ─────────────────────────────────────────────────── */
+.notifBanner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: #92400e;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Error Banner ────────────────────────────────────────────────────────── */
+.errorBanner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  color: #7f1d1d;
+  margin-bottom: 1.5rem;
+}
+
+.errorBanner code {
+  background: #fee2e2;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.83rem;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+.section {
+  margin-bottom: 2.5rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin: 0 0 1rem;
+}
+
+.sectionHeader .sectionTitle {
+  margin: 0;
+}
+
+.seeAllLink {
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.seeAllLink:hover {
+  text-decoration: underline;
+}
+
+/* ── Recommended Offers ──────────────────────────────────────────────────── */
+.recList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: var(--shadow-card);
+}
+
+.recCard:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.12);
+  transform: translateX(3px);
+}
+
+.recCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.recTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin: 0 0 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recEmpresa {
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.recMeta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recMeta span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.matchBadge {
+  display: inline-block;
+  margin-top: 0.4rem;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 20px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── Empty State ─────────────────────────────────────────────────────────── */
+.emptyRec {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.emptyIcon {
+  font-size: 2.5rem;
+}
+
+/* ── Quick Access Grid ───────────────────────────────────────────────────── */
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.quickCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--secondary);
+  text-decoration: none;
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+  box-shadow: var(--shadow-card);
+}
+
+.quickCard:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 14px rgba(0, 115, 173, 0.15);
+  transform: translateY(-2px);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.quickIcon {
+  font-size: 1.8rem;
+}
+
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.skeletonCard, .skeletonRec {
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e8edf0 25%, #f4f6f8 50%, #e8edf0 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+.skeletonCard {
+  height: 120px;
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.skeletonRec {
+  height: 72px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+  }
+  .greeting {
+    font-size: 1.4rem;
+  }
+  .metricsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .quickGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .recCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,138 @@
+/* ── ProfesorDashboardPage.module.css — estilos actualizados ────────────── */
+
+/* ── Bienvenida ──────────────────────────────────────────────────────────── */
+.welcomeCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid #1a6d3a;
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-card);
+  animation: fadeIn 0.4s ease;
+}
+
+.welcomeIcon { font-size: 2.5rem; flex-shrink: 0; }
+
+.welcomeTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--secondary);
+  margin-bottom: 0.35rem;
+}
+
+.welcomeDesc { color: var(--text-muted); font-size: 0.92rem; line-height: 1.6; }
+
+/* ── Métricas ─────────────────────────────────────────────────────────────── */
+.metricsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.metricCard {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-top: 4px solid var(--mc, var(--primary));
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metricCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.12);
+}
+
+.metricIcon  { font-size: 1.5rem; }
+.metricValue { font-size: 2rem; font-weight: 800; color: var(--mc, var(--primary)); }
+.metricLabel { font-size: 0.73rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ── Grid de alumnos ──────────────────────────────────────────────────────── */
+.alumnosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.alumnoCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.alumnoCard:hover {
+  border-color: #1a6d3a;
+  box-shadow: 0 4px 14px rgba(26, 109, 58, 0.12);
+}
+
+.alumnoAvatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #1a6d3a;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alumnoInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.alumnoInfo strong { font-size: 0.92rem; color: var(--secondary); }
+.alumnoInfo span   { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Fecha en tabla ──────────────────────────────────────────────────────── */
+.fechaTd { font-size: 0.82rem; color: var(--text-muted); white-space: nowrap; }
+
+/* ── Alerta de avales pendientes ────────────────────────────────────────── */
+.avalesAlert {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #fff8e1;
+  border: 1.5px solid #f9c74f;
+  border-left: 4px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.5rem;
+  margin-top: 2rem;
+  box-shadow: var(--shadow-card);
+}
+
+.avalesAlert span { font-size: 1.8rem; flex-shrink: 0; }
+.avalesAlert div  { flex: 1; }
+.avalesAlert strong { color: var(--secondary); font-size: 0.95rem; }
+.avalesAlert p { color: var(--text-muted); font-size: 0.87rem; margin-top: 0.2rem; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .metricsRow     { grid-template-columns: repeat(2, 1fr); }
+  .alumnosGrid    { grid-template-columns: 1fr; }
+  .avalesAlert    { flex-direction: column; align-items: flex-start; }
+}

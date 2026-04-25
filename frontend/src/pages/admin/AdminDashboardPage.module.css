@@ -1,0 +1,156 @@
+/* ── Stats Grid ──────────────────────────────────────────────────────────── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-top: 4px solid var(--sc, var(--primary));
+  border-radius: var(--radius);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-card);
+}
+
+.statCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 115, 173, 0.12);
+}
+
+.statCard.highlight {
+  border-top-color: var(--success);
+  background: #f0faf4;
+}
+
+.statIcon { font-size: 1.5rem; }
+
+.statNum {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--sc, var(--primary));
+}
+
+.statCard.highlight .statNum { color: var(--success); }
+
+.statLabel {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Skeleton ────────────────────────────────────────────────────────────── */
+.skeletonCard {
+  height: 120px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f8 50%, #e8edf2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Chart Container ─────────────────────────────────────────────────────── */
+.chartContainer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-card);
+}
+
+.chartContainer h2 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* ── Actividad reciente ───────────────────────────────────────────────────── */
+.actividadList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.actividadItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7rem 1rem;
+  font-size: 0.88rem;
+  transition: border-color 0.15s;
+}
+
+.actividadItem:hover { border-color: var(--primary); }
+
+.actividadIcon { font-size: 1.1rem; flex-shrink: 0; }
+
+.actividadBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+}
+
+.actividadFecha {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ── Secciones Admin ─────────────────────────────────────────────────────── */
+.adminSection { margin-bottom: 2.5rem; }
+
+.pendientesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pendienteCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s;
+}
+
+.pendienteCard:hover { border-color: var(--primary); }
+.pendienteCard strong { font-size: 0.95rem; color: var(--secondary); }
+.pendienteCard p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
+
+.pendienteActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .statsGrid { grid-template-columns: repeat(2, 1fr); }
+  .pendienteCard { flex-direction: column; align-items: flex-start; }
+}
