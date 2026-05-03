@@ -22,6 +22,7 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/oferta.controller');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
+const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 
 // ── Rutas con path fijo (deben ir ANTES de /:id) ─────────────────────────────
 
@@ -39,9 +40,18 @@ router.get(
 router.get('/', ctrl.getOfertas);           // Lista de ofertas con filtros opcionales
 router.get('/:id', ctrl.getOfertaById);     // Detalle de una oferta y su empresa
 
-// ── Rutas empresa (requieren autenticación y rol 'empresa') ───────────────────
-router.post('/', verifyToken, authorizeRoles('empresa'), ctrl.createOferta);      // Crear oferta
-router.put('/:id', verifyToken, authorizeRoles('empresa'), ctrl.updateOferta);    // Editar oferta
-router.delete('/:id', verifyToken, authorizeRoles('empresa'), ctrl.deleteOferta); // Cerrar oferta
+// ── Rutas empresa (propietario, gerente y reclutador pueden crear/editar ofertas) ──────────
+// verifyEmpresaMember inyecta req.empresa para los controllers
+// authorizeEmpresaRoles restringe a los roles con permisos de escritura
+const puedeEscribirOferta = [
+  verifyToken,
+  authorizeRoles('empresa'),
+  verifyEmpresaMember,
+  authorizeEmpresaRoles('propietario', 'gerente', 'reclutador'),
+];
+
+router.post('/', ...puedeEscribirOferta, ctrl.createOferta);      // Crear oferta
+router.put('/:id', ...puedeEscribirOferta, ctrl.updateOferta);    // Editar oferta
+router.delete('/:id', ...puedeEscribirOferta, ctrl.deleteOferta); // Cerrar oferta
 
 module.exports = router;

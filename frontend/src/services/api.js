@@ -43,12 +43,15 @@ api.interceptors.response.use(
 // ── Servicio de autenticación ─────────────────────────────────────────────────
 // Funciones para los endpoints de /api/auth
 export const authService = {
-  register: (data) => api.post('/auth/register', data),                         // Registrar usuario
-  login: (data) => api.post('/auth/login', data),                               // Iniciar sesión
-  me: () => api.get('/auth/me'),                                                 // Obtener usuario actual
-  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),      // Solicitar recupero
-  resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }), // Cambiar contraseña
+  register: (data) => api.post('/auth/register', data),
+  login: (data) => api.post('/auth/login', data),
+  me: () => api.get('/auth/me'),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
+  cambiarPassword: (passwordActual, nuevaPassword) =>
+    api.put('/auth/cambiar-password', { passwordActual, nuevaPassword }),
 };
+
 
 // ── Servicio de ofertas ───────────────────────────────────────────────────────
 // Funciones para los endpoints de /api/ofertas
@@ -77,6 +80,9 @@ export const userService = {
   updatePerfil: (data) => api.put('/users/perfil', data), // Actualizar mi perfil
   subirCV: (formData) => api.post('/users/perfil/cv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },  // Header especial para subida de archivos
+  }),
+  subirCartaRecomendacion: (formData) => api.post('/users/perfil/carta-recomendacion', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   }),
 };
 
@@ -118,6 +124,16 @@ export const adminService = {
   // Logs del sistema (v1.4)
   getLogs:               (params) => api.get('/admin/logs', { params }),
   exportarLogs:          (params) => api.get('/admin/logs/export', { params, responseType: 'blob' }),
+
+  // Solicitudes de registro de empresa (v1.6)
+  getSolicitudesEmpresa:  (params) => api.get('/admin/solicitudes-empresa', { params }),
+  aprobarSolicitud:       (id)     => api.patch(`/admin/solicitudes-empresa/${id}/aprobar`),
+  rechazarSolicitud:      (id, motivo) => api.patch(`/admin/solicitudes-empresa/${id}/rechazar`, { motivo }),
+
+  // Solicitudes de reclutadores (v1.7)
+  getSolicitudesReclutador:      (params) => api.get('/admin/solicitudes-reclutador', { params }),
+  aprobarSolicitudReclutador:    (id)     => api.patch(`/admin/solicitudes-reclutador/${id}/aprobar`),
+  rechazarSolicitudReclutador:   (id, motivo) => api.patch(`/admin/solicitudes-reclutador/${id}/rechazar`, { motivo }),
 };
 
 // ── Servicio del profesor ───────────────────────────────────────────────────
@@ -125,7 +141,8 @@ export const adminService = {
 export const profesorService = {
   getMisAlumnos:       () => api.get('/profesor/alumnos'),
   getPostulaciones:    () => api.get('/profesor/postulaciones'),
-  getAvalesPendientes: () => api.get('/profesor/avales/pendientes'),
+  // El backend no tiene /pendientes — usa query param ?estado=pendiente
+  getAvalesPendientes: () => api.get('/profesor/avales', { params: { estado: 'pendiente' } }),
   getAvales:           () => api.get('/profesor/avales'),
 
   // Método unificado para crear/editar cualquier decisión sobre un aval
@@ -135,31 +152,44 @@ export const profesorService = {
   // Atajos específicos (mantienen retrocompatibilidad)
   aprobarAval:  (id, comentario) => api.patch(`/profesor/avales/${id}`, { estado: 'aprobado', comentario }),
   rechazarAval: (id, motivo)    => api.patch(`/profesor/avales/${id}`, { estado: 'rechazado', comentario: motivo }),
-  getReportes:  () => api.get('/profesor/reportes'),
 
   // Accesibles por el alumno
   listarProfesores: () => api.get('/profesor/lista'),
   solicitarAval:    (data) => api.post('/profesor/solicitar-aval', data),
 };
 
+
 // ── Servicio de mensajes (chat) ─────────────────────────────────────────────
-// Funciones para los endpoints de /api/mensajes (todos los roles autenticados)
+// Funciones para los endpoints de /api/chat (todos los roles autenticados)
 export const mensajeService = {
-  getConversaciones: () => api.get('/mensajes/conversaciones'),                      // Listar conversaciones
-  getMensajes: (conversacionId) => api.get(`/mensajes/${conversacionId}`),          // Ver mensajes de una conversación
-  enviar: (data) => api.post('/mensajes', data),                                     // Enviar mensaje
-  marcarLeido: (mensajeId) => api.patch(`/mensajes/${mensajeId}/leer`),             // Marcar como leído
+  // GET /api/chat → lista de conversaciones del usuario autenticado
+  getConversaciones: () => api.get('/chat'),
+  // GET /api/chat/usuarios?q=texto → buscar usuarios para iniciar un nuevo chat
+  buscarUsuarios: (q) => api.get('/chat/usuarios', { params: { q } }),
+  // GET /api/chat/:usuarioId → historial de mensajes con un usuario específico
+  getMensajes: (usuarioId) => api.get(`/chat/${usuarioId}`),
+  // POST /api/chat → enviar mensaje: { receptorId, mensaje }
+  enviar: (data) => api.post('/chat', data),
+  // PATCH /api/chat/:usuarioId/leer → marcar conversación con ese usuario como leída
+  marcarLeida: (usuarioId) => api.patch(`/chat/${usuarioId}/leer`),
 };
 
 // ── Servicio de empresa ───────────────────────────────────────────────────────
 // Funciones para los endpoints de /api/empresas (accesibles con rol empresa)
 export const empresaService = {
-  getDashboard:    () => api.get('/empresas/dashboard'),
-  getMisOfertas:   () => api.get('/empresas/mis-ofertas'),
-  getEquipo:       () => api.get('/empresas/equipo'),
-  agregarMiembro:  (data) => api.post('/empresas/equipo', data),
-  editarMiembro:   (id, data) => api.patch(`/empresas/equipo/${id}`, data),
-  eliminarMiembro: (id) => api.delete(`/empresas/equipo/${id}`),
+  getDashboard:          () => api.get('/empresas/dashboard'),
+  getMisOfertas:         () => api.get('/empresas/mis-ofertas'),
+  getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
+  updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
+  getEquipo:             () => api.get('/empresas/equipo'),
+  editarMiembro:         (id, data) => api.patch(`/empresas/equipo/${id}`, data),
+  resetPasswordMiembro:  (id, password) => api.patch(`/empresas/equipo/${id}/password`, { password }),
+  eliminarMiembro:       (id) => api.delete(`/empresas/equipo/${id}`),
+  // Solicitudes de reclutadores (reemplaza la creación directa)
+  solicitarReclutador:        (data) => api.post('/empresas/equipo/solicitar', data),
+  getMisSolicitudesReclutador: () => api.get('/empresas/equipo/solicitudes'),
 };
 
+
 export default api;
+

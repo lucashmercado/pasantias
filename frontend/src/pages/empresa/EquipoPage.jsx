@@ -2,18 +2,13 @@
  * EquipoPage.jsx — Gestión del equipo reclutador de la empresa.
  *
  * Ruta: /empresa/equipo
+ * Acceso: solo propietario puede enviar solicitudes y gestionar miembros.
+ *         otros roles pueden ver (solo lectura).
  *
- * Funciones:
- * - Listar todos los reclutadores activos del equipo
- * - Agregar un nuevo miembro (email + rolInterno)
- * - Editar el rol interno de un miembro existente (inline)
- * - Eliminar un miembro con confirmación
- *
- * Servicios consumidos:
- * - GET    /api/empresas/equipo
- * - POST   /api/empresas/equipo
- * - PATCH  /api/empresas/equipo/:id
- * - DELETE /api/empresas/equipo/:id
+ * Flujo de alta de reclutadores:
+ *   1. Propietario llena formulario (nombre + email) → POST /equipo/solicitar
+ *   2. Admin aprueba → usuario creado automáticamente → email con credenciales
+ *   3. Reclutador inicia sesión y cambia su contraseña desde /empresa/seguridad
  */
 
 import { useState, useEffect } from 'react';
@@ -21,258 +16,511 @@ import { Link } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 import styles from './EquipoPage.module.css';
 
-const ROLES_INTERNOS = [
-  { value: 'reclutador',        label: 'Reclutador' },
-  { value: 'reclutador_senior', label: 'Reclutador Senior' },
-  { value: 'coordinador',       label: 'Coordinador de RRHH' },
-  { value: 'gerente',           label: 'Gerente de RRHH' },
-  { value: 'admin_empresa',     label: 'Administrador de empresa' },
-];
+/* ── Helpers ─────────────────────────────────────────────────────────────────── */
+const ROL_COLORS = { propietario: '#7c3aed', gerente: '#2563eb', reclutador: '#0891b2', viewer: '#64748b' };
+function rolColor(rol) { return ROL_COLORS[rol] ?? '#64748b'; }
+function rolLabel(rol) {
+  return { propietario: 'Propietario', gerente: 'Gerente', reclutador: 'Reclutador', viewer: 'Solo lectura' }[rol] ?? rol;
+}
+function formatFecha(iso) {
+  if (!iso) return 'Nunca';
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-/** Fila editable de un miembro del equipo */
-function MiembroRow({ miembro, onSave, onDelete }) {
-  const [editando, setEditando] = useState(false);
-  const [rolEdit,  setRolEdit]  = useState(miembro.rolInterno ?? '');
-  const [saving,   setSaving]   = useState(false);
+const ESTADO_SOLICITUD = {
+  pendiente:  { label: 'Pendiente',  color: '#ca8a04', bg: '#fef9c3' },
+  aprobado:   { label: 'Aprobado',   color: '#15803d', bg: '#dcfce7' },
+  rechazado:  { label: 'Rechazado',  color: '#dc2626', bg: '#fee2e2' },
+};
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await onSave(miembro.id, rolEdit);
-      setEditando(false);
-    } catch (_) {
-      alert('Error al guardar el rol.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
+/* ── Modal genérico ─────────────────────────────────────────────────────────── */
+function Modal({ titulo, onClose, children }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
-    <tr>
-      {/* Avatar + Nombre */}
-      <td>
-        <div className={styles.miembroNombre}>
-          <div className={styles.avatar}>
-            {(miembro.nombre?.[0] ?? '?').toUpperCase()}
-          </div>
-          <div>
-            <strong>{miembro.nombre} {miembro.apellido}</strong>
-            <span className={styles.miembroEmail}>{miembro.email}</span>
-          </div>
+    <div className={styles.overlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h3>{titulo}</h3>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
-      </td>
-
-      {/* Rol interno — editable en línea */}
-      <td>
-        {editando ? (
-          <select
-            value={rolEdit}
-            onChange={(e) => setRolEdit(e.target.value)}
-            className={styles.rolSelect}
-          >
-            {ROLES_INTERNOS.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
-        ) : (
-          <span className="badge badge-empresa" style={{ textTransform: 'none', fontSize: '0.8rem' }}>
-            {ROLES_INTERNOS.find((r) => r.value === miembro.rolInterno)?.label ?? miembro.rolInterno ?? '—'}
-          </span>
-        )}
-      </td>
-
-      {/* Estado del miembro */}
-      <td>
-        <span className={`badge badge-${miembro.activo !== false ? 'activa' : 'cerrada'}`}>
-          {miembro.activo !== false ? 'Activo' : 'Inactivo'}
-        </span>
-      </td>
-
-      {/* Acciones */}
-      <td>
-        <div className={styles.accionesRow}>
-          {editando ? (
-            <>
-              <button className="btn-ok" onClick={handleSave} disabled={saving}>
-                {saving ? '...' : '✓ Guardar'}
-              </button>
-              <button className="btn-secondary" onClick={() => { setEditando(false); setRolEdit(miembro.rolInterno ?? ''); }}>
-                Cancelar
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn-small" onClick={() => setEditando(true)}>
-                ✏️ Editar rol
-              </button>
-              <button
-                className="btn-danger"
-                onClick={() => {
-                  if (window.confirm(`¿Eliminar a ${miembro.nombre} del equipo?`)) {
-                    onDelete(miembro.id);
-                  }
-                }}
-              >
-                🗑 Eliminar
-              </button>
-            </>
-          )}
-        </div>
-      </td>
-    </tr>
+        {children}
+      </div>
+    </div>
   );
 }
 
-/** Formulario para agregar un nuevo miembro */
-function AgregarMiembroForm({ onAgregado }) {
-  const [form, setForm]       = useState({ email: '', rolInterno: 'reclutador' });
+/* ── Modal: Solicitar reclutador ────────────────────────────────────────────── */
+function ModalSolicitarReclutador({ onClose, onEnviada }) {
+  const [form, setForm] = useState({ nombre: '', email: '' });
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-  const [abierto, setAbierto] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.nombre.trim() || !form.email.trim()) {
+      setError('Nombre y email son requeridos.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const { data } = await empresaService.agregarMiembro(form);
-      onAgregado(data.data ?? data);
-      setForm({ email: '', rolInterno: 'reclutador' });
-      setAbierto(false);
+      const { data } = await empresaService.solicitarReclutador(form);
+      onEnviada(data.data);
+      onClose();
     } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al agregar el miembro.');
+      setError(err.response?.data?.message ?? 'Error al enviar la solicitud.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={styles.formCard}>
-      <button
-        className={abierto ? 'btn-secondary' : 'btn-primary'}
-        onClick={() => { setAbierto(!abierto); setError(''); }}
-        style={{ marginBottom: abierto ? '1rem' : 0 }}
-      >
-        {abierto ? '✕ Cancelar' : '+ Agregar miembro'}
-      </button>
+    <Modal titulo="📋 Solicitar nuevo reclutador" onClose={onClose}>
+      <form onSubmit={handleSubmit} className={styles.modalForm}>
 
-      {abierto && (
-        <form onSubmit={handleSubmit} className={styles.agregarForm}>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Email del nuevo reclutador *</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                required
-                placeholder="reclutador@empresa.com"
-              />
-            </div>
-            <div className="form-group">
-              <label>Rol interno</label>
-              <select
-                value={form.rolInterno}
-                onChange={(e) => setForm({ ...form, rolInterno: e.target.value })}
-              >
-                {ROLES_INTERNOS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {error && <p className="error-msg">{error}</p>}
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Agregando...' : '✓ Confirmar'}
+        <div className={styles.infoBox}>
+          <span>ℹ️</span>
+          <span>
+            La solicitud será revisada por el administrador del instituto.
+            Al aprobarla, se creará la cuenta y se enviarán las credenciales por email.
+          </span>
+        </div>
+
+        <div className={styles.fieldGroup}>
+          <label>Nombre completo *</label>
+          <input
+            type="text"
+            value={form.nombre}
+            onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+            placeholder="Juan Pérez"
+            required
+            autoFocus
+          />
+        </div>
+
+        <div className={styles.fieldGroup}>
+          <label>Email *</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+            placeholder="reclutador@empresa.com"
+            required
+          />
+        </div>
+
+        {error && <p className={styles.errorMsg}>⚠️ {error}</p>}
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button type="submit" className={styles.btnPrimary} disabled={loading}>
+            {loading ? 'Enviando...' : '📤 Enviar solicitud'}
           </button>
-        </form>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ── Modal: Cambiar contraseña ──────────────────────────────────────────────── */
+function ModalCambiarPassword({ miembro, onClose, onGuardado }) {
+  const [pwd, setPwd] = useState('');
+  const [mostrar, setMostrar] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (pwd.length < 6) { setError('Mínimo 6 caracteres.'); return; }
+    setLoading(true);
+    try {
+      await empresaService.resetPasswordMiembro(miembro.id, pwd);
+      onGuardado();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Error al cambiar la contraseña.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal titulo={`🔑 Cambiar contraseña — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className={styles.modalForm}>
+        <div className={styles.fieldGroup}>
+          <label>Nueva contraseña *</label>
+          <div className={styles.passwordField}>
+            <input
+              type={mostrar ? 'text' : 'password'}
+              value={pwd}
+              onChange={e => { setPwd(e.target.value); setError(''); }}
+              placeholder="Mínimo 6 caracteres"
+              autoFocus required
+            />
+            <button type="button" className={styles.togglePwd} onClick={() => setMostrar(p => !p)}>
+              {mostrar ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {pwd.length > 0 && pwd.length < 6 && (
+            <span className={styles.errorMsg}>Debe tener al menos 6 caracteres</span>
+          )}
+        </div>
+        {error && <p className={styles.errorMsg}>{error}</p>}
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button type="submit" className={styles.btnPrimary} disabled={loading || pwd.length < 6}>
+            {loading ? 'Guardando...' : '🔑 Cambiar contraseña'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ── Modal: Editar rol ──────────────────────────────────────────────────────── */
+const ROLES = [
+  { value: 'reclutador', label: 'Reclutador',   color: '#0891b2', desc: 'Crea ofertas y gestiona candidatos' },
+  { value: 'gerente',    label: 'Gerente',       color: '#2563eb', desc: 'Gestiona el perfil y el equipo' },
+  { value: 'viewer',     label: 'Solo lectura',  color: '#64748b', desc: 'Solo puede visualizar' },
+];
+
+function ModalEditarRol({ miembro, onClose, onGuardado }) {
+  const [rolInterno, setRol] = useState(miembro.rolInterno ?? 'reclutador');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await empresaService.editarMiembro(miembro.id, { rolInterno });
+      onGuardado(rolInterno);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Error al cambiar el rol.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal titulo={`✏️ Cambiar rol — ${miembro.usuario?.nombre ?? miembro.nombre}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className={styles.modalForm}>
+        <div className={styles.fieldGroup}>
+          <label>Rol en el equipo</label>
+          <div className={styles.rolRadioGroup}>
+            {ROLES.map(r => (
+              <label key={r.value}
+                className={`${styles.rolRadio} ${rolInterno === r.value ? styles.rolRadioActive : ''}`}
+                style={rolInterno === r.value ? { borderColor: r.color, background: r.color + '12' } : {}}
+              >
+                <input type="radio" name="rolInterno" value={r.value} checked={rolInterno === r.value} onChange={() => setRol(r.value)} />
+                <div>
+                  <strong style={rolInterno === r.value ? { color: r.color } : {}}>{r.label}</strong>
+                  <span>{r.desc}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+        {error && <p className={styles.errorMsg}>{error}</p>}
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button type="submit" className={styles.btnPrimary} disabled={loading}>
+            {loading ? 'Guardando...' : '✓ Guardar rol'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
+function MiembroCard({ miembro, esPropietario, onEditarRol, onCambiarPwd, onToggleActivo, onEliminar }) {
+  const u = miembro.usuario ?? miembro;
+  const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
+  const inicial = nombre[0]?.toUpperCase() ?? '?';
+  const esProp = miembro.rolInterno === 'propietario';
+
+  return (
+    <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
+      <div className={styles.cardAvatar} style={{ background: rolColor(miembro.rolInterno) }}>{inicial}</div>
+      <div className={styles.cardInfo}>
+        <div className={styles.cardNombre}>
+          <strong>{nombre}</strong>
+          {esProp && <span className={styles.propietarioBadge}>Propietario</span>}
+          {!miembro.activo && <span className={styles.suspendidoBadge}>Suspendido</span>}
+        </div>
+        <span className={styles.cardEmail}>{u.email}</span>
+        <div className={styles.cardMeta}>
+          <span className={styles.cardFecha}>Último acceso: {formatFecha(u.ultimoAcceso)}</span>
+        </div>
+      </div>
+      {esPropietario && !esProp && (
+        <div className={styles.cardAcciones}>
+          <button className={`${styles.btnAccion} ${miembro.activo ? styles.btnWarning : styles.btnOk}`} onClick={() => onToggleActivo(miembro)}>
+            {miembro.activo ? '⏸ Suspender' : '▶ Reactivar'}
+          </button>
+          <button className={`${styles.btnAccion} ${styles.btnDanger}`} onClick={() => onEliminar(miembro)}>🗑 Quitar</button>
+        </div>
       )}
     </div>
   );
 }
 
-/* ── Componente principal ──────────────────────────────────────────────────── */
+/* ── Fila de solicitud de reclutador ────────────────────────────────────────── */
+function SolicitudRow({ sol }) {
+  const est = ESTADO_SOLICITUD[sol.estado] ?? ESTADO_SOLICITUD.pendiente;
+  return (
+    <tr>
+      <td><strong>{sol.nombre}</strong></td>
+      <td style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{sol.email}</td>
+      <td>
+        <span style={{ background: est.bg, color: est.color, padding: '3px 10px', borderRadius: 99, fontSize: '0.8rem', fontWeight: 600 }}>
+          {est.label}
+        </span>
+      </td>
+      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+        {new Date(sol.createdAt).toLocaleDateString('es-AR')}
+      </td>
+    </tr>
+  );
+}
+
+/* ── Componente principal ───────────────────────────────────────────────────── */
 export default function EquipoPage() {
-  const [equipo,  setEquipo]  = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const [equipo,      setEquipo]      = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [toast,       setToast]       = useState('');
+  const [rolEnEquipo, setRolEnEquipo] = useState(null);
+
+  const [modalSolicitar, setModalSolicitar] = useState(false);
+  const [modalRol,       setModalRol]       = useState(null);
+  const [modalPwd,       setModalPwd]       = useState(null);
+
+  const esPropietario = rolEnEquipo === 'propietario';
+  const activos    = equipo.filter(m => m.activo !== false);
+  const suspendidos = equipo.filter(m => m.activo === false);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); };
 
   useEffect(() => {
-    empresaService
-      .getEquipo()
-      .then(({ data }) => setEquipo(data.data ?? data ?? []))
-      .catch(() => setError('No se pudo cargar el equipo. Intentá de nuevo.'))
-      .finally(() => setLoading(false));
+    async function cargar() {
+      try {
+        const [equipoRes, solRes] = await Promise.all([
+          empresaService.getEquipo(),
+          empresaService.getMisSolicitudesReclutador(),
+        ]);
+        setEquipo(equipoRes.data.data ?? []);
+        if (equipoRes.data.rolEnEquipo) setRolEnEquipo(equipoRes.data.rolEnEquipo);
+        setSolicitudes(solRes.data.data ?? []);
+      } catch {
+        setError('No se pudo cargar el equipo. Intentá de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    cargar();
   }, []);
 
-  const handleAgregado = (nuevoMiembro) => {
-    setEquipo((prev) => [...prev, nuevoMiembro]);
+  const handleEnviada = (nueva) => {
+    setSolicitudes(prev => [nueva, ...prev]);
+    showToast('✅ Solicitud enviada. El administrador la revisará pronto.');
   };
 
-  const handleSave = async (id, rolInterno) => {
-    await empresaService.editarMiembro(id, { rolInterno });
-    setEquipo((prev) => prev.map((m) => (m.id === id ? { ...m, rolInterno } : m)));
+  const handleRolGuardado = (id, nuevoRol) => {
+    setEquipo(prev => prev.map(m => m.id === id ? { ...m, rolInterno: nuevoRol } : m));
+    showToast('✓ Rol actualizado.');
   };
 
-  const handleDelete = async (id) => {
+  const handlePwdGuardada = () => {
+    showToast('✓ Contraseña actualizada.');
+  };
+
+  const handleToggleActivo = async (miembro) => {
+    const nuevoEstado = !miembro.activo;
+    const accion = nuevoEstado ? 'reactivar' : 'suspender';
+    if (!window.confirm(`¿Querés ${accion} la cuenta de ${miembro.usuario?.nombre ?? miembro.nombre}?`)) return;
     try {
-      await empresaService.eliminarMiembro(id);
-      setEquipo((prev) => prev.filter((m) => m.id !== id));
-    } catch (_) {
-      alert('Error al eliminar el miembro.');
+      await empresaService.editarMiembro(miembro.id, { activo: nuevoEstado });
+      setEquipo(prev => prev.map(m => m.id === miembro.id ? { ...m, activo: nuevoEstado } : m));
+      showToast(`✓ Cuenta ${nuevoEstado ? 'reactivada' : 'suspendida'}.`);
+    } catch {
+      showToast('✗ Error al cambiar el estado.');
     }
   };
 
+  const handleEliminar = async (miembro) => {
+    const nombre = miembro.usuario?.nombre ?? miembro.nombre;
+    if (!window.confirm(`¿Querés quitar a ${nombre} del equipo?`)) return;
+    try {
+      await empresaService.eliminarMiembro(miembro.id);
+      setEquipo(prev => prev.filter(m => m.id !== miembro.id));
+      showToast(`✓ ${nombre} fue quitado del equipo.`);
+    } catch {
+      showToast('✗ Error al eliminar el miembro.');
+    }
+  };
+
+  const solicitudesPendientes = solicitudes.filter(s => s.estado === 'pendiente');
+
   return (
     <div className="page-container">
-      {/* ── Cabecera ─────────────────────────────────────────────────────── */}
+
+      {/* ── Cabecera ── */}
       <div className="dashboard-header">
         <div>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1>Equipo Reclutador</h1>
+          <h1>Gestión del equipo</h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem', fontSize: '0.9rem' }}>
+            Administrá los accesos y roles de tu equipo de reclutadores.
+          </p>
         </div>
-        <span className="badge badge-empresa" style={{ alignSelf: 'flex-end', fontSize: '0.85rem' }}>
-          {equipo.length} miembro{equipo.length !== 1 ? 's' : ''}
-        </span>
+        {esPropietario && (
+          <button className={styles.btnPrimary} onClick={() => setModalSolicitar(true)} id="btn-nuevo-miembro">
+            + Solicitar reclutador
+          </button>
+        )}
       </div>
 
-      {/* ── Error global ─────────────────────────────────────────────────── */}
-      {error && <p className="error-msg" style={{ marginBottom: '1.5rem' }}>{error}</p>}
+      {/* Toast y error */}
+      {toast && <div className={styles.toast}>{toast}</div>}
+      {error && <p className={styles.errorMsg}>{error}</p>}
 
-      {/* ── Formulario agregar ───────────────────────────────────────────── */}
-      <AgregarMiembroForm onAgregado={handleAgregado} />
-
-      {/* ── Tabla del equipo ─────────────────────────────────────────────── */}
-      {loading ? (
+      {/* Skeleton */}
+      {loading && (
         <div className={styles.skeletonList}>
-          {[1, 2, 3].map((i) => <div key={i} className={styles.skeletonRow} />)}
+          {[1, 2, 3].map(i => <div key={i} className={styles.skeletonRow} />)}
         </div>
-      ) : equipo.length === 0 ? (
-        <div className={styles.emptyState}>
-          <span>👥</span>
-          <p>El equipo está vacío. Agregá tu primer reclutador.</p>
+      )}
+
+      {/* ── Solicitudes pendientes — aviso destacado ── */}
+      {!loading && solicitudesPendientes.length > 0 && (
+        <div className={styles.alertPendiente}>
+          <span>⏳</span>
+          <span>
+            Tenés <strong>{solicitudesPendientes.length}</strong> solicitud{solicitudesPendientes.length > 1 ? 'es' : ''} de reclutador pendiente{solicitudesPendientes.length > 1 ? 's' : ''} de aprobación por el administrador.
+          </span>
         </div>
-      ) : (
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Miembro</th>
-              <th>Rol interno</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {equipo.map((m) => (
-              <MiembroRow
-                key={m.id}
-                miembro={m}
-                onSave={handleSave}
-                onDelete={handleDelete}
+      )}
+
+      {/* ── Stats ── */}
+      {!loading && equipo.length > 0 && (
+        <div className={styles.statsRow}>
+          <div className={styles.statChip}>
+            <span className={styles.statNum}>{equipo.length}</span><span>Total</span>
+          </div>
+          <div className={styles.statChip}>
+            <span className={styles.statNum} style={{ color: '#16a34a' }}>{activos.length}</span><span>Activos</span>
+          </div>
+          {suspendidos.length > 0 && (
+            <div className={styles.statChip}>
+              <span className={styles.statNum} style={{ color: '#dc2626' }}>{suspendidos.length}</span><span>Suspendidos</span>
+            </div>
+          )}
+          {solicitudesPendientes.length > 0 && (
+            <div className={styles.statChip}>
+              <span className={styles.statNum} style={{ color: '#ca8a04' }}>{solicitudesPendientes.length}</span><span>Solicitudes</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Lista activos ── */}
+      {!loading && activos.length > 0 && (
+        <section className={styles.seccion}>
+          <h2 className={styles.seccionTitulo}>Miembros activos</h2>
+          <div className={styles.listaCards}>
+            {activos.map(m => (
+              <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
+                onEditarRol={() => setModalRol(m)}
+                onCambiarPwd={() => setModalPwd(m)}
+                onToggleActivo={handleToggleActivo}
+                onEliminar={handleEliminar}
               />
             ))}
-          </tbody>
-        </table>
+          </div>
+        </section>
+      )}
+
+      {/* ── Lista suspendidos ── */}
+      {!loading && suspendidos.length > 0 && (
+        <section className={styles.seccion}>
+          <h2 className={styles.seccionTitulo} style={{ color: 'var(--text-muted)' }}>Cuentas suspendidas</h2>
+          <div className={styles.listaCards}>
+            {suspendidos.map(m => (
+              <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
+                onEditarRol={() => setModalRol(m)}
+                onCambiarPwd={() => setModalPwd(m)}
+                onToggleActivo={handleToggleActivo}
+                onEliminar={handleEliminar}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Historial de solicitudes de reclutadores ── */}
+      {!loading && solicitudes.length > 0 && (
+        <section className={styles.seccion} style={{ marginTop: '2rem' }}>
+          <h2 className={styles.seccionTitulo}>Solicitudes de reclutadores</h2>
+          <div className={styles.tablaWrap}>
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Estado</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {solicitudes.map(s => <SolicitudRow key={s.id} sol={s} />)}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ── Estado vacío ── */}
+      {!loading && equipo.length === 0 && solicitudes.length === 0 && (
+        <div className={styles.emptyState}>
+          <span>👥</span>
+          <p>El equipo está vacío.</p>
+          {esPropietario && (
+            <button className={styles.btnPrimary} onClick={() => setModalSolicitar(true)}>
+              + Solicitar primer reclutador
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Modales ── */}
+      {modalSolicitar && (
+        <ModalSolicitarReclutador
+          onClose={() => setModalSolicitar(false)}
+          onEnviada={handleEnviada}
+        />
+      )}
+      {modalRol && (
+        <ModalEditarRol
+          miembro={modalRol}
+          onClose={() => setModalRol(null)}
+          onGuardado={(nuevoRol) => { handleRolGuardado(modalRol.id, nuevoRol); setModalRol(null); }}
+        />
+      )}
+      {modalPwd && (
+        <ModalCambiarPassword
+          miembro={modalPwd}
+          onClose={() => setModalPwd(null)}
+          onGuardado={handlePwdGuardada}
+        />
       )}
     </div>
   );

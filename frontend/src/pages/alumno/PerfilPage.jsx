@@ -18,16 +18,52 @@ import { userService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import styles from './PerfilPage.module.css';
 
-// Porcentaje de completitud del perfil
-function calcularCompletitud(form) {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+// Convierte array de certificaciones a texto (una por línea) para el textarea
+function certToText(val) {
+  if (!val) return '';
+  if (Array.isArray(val)) return val.join('\n');
+  return String(val);
+}
+
+// Convierte texto del textarea a array para el backend
+function textToCert(text) {
+  if (!text || !text.trim()) return [];
+  return text.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * Calcula el % de completitud usando los MISMOS 15 campos que el backend
+ * (_calcularCompletitudPerfil en student.controller.js), para que el número
+ * del dashboard y el del perfil siempre coincidan.
+ */
+function calcularCompletitud(form, perfil) {
   const campos = [
-    form.carrera, form.anioEgreso, form.descripcion, form.areaInteres,
-    form.linkedin || form.github || form.portfolio,
-    form.experienciaLaboral, form.disponibilidad,
-    form.salarioPretendido, form.preferenciasLaborales,
+    !!form.carrera,
+    !!form.descripcion,
+    // habilidades: array en la BD — si el perfil ya las tiene se cuenta
+    perfil?.habilidades?.length > 0,
+    // idiomas: igual
+    perfil?.idiomas?.length > 0,
+    !!form.linkedin,
+    !!form.github,
+    // cvPath: archivo subido, no editable en este form
+    !!(perfil?.cvPath),
+    !!form.areaInteres,
+    !!form.disponibilidad,
+    !!form.fotoPerfil,
+    !!form.portfolio,
+    !!form.experienciaLaboral,
+    // certificaciones: puede venir como texto con saltos de línea
+    !!(form.certificaciones && form.certificaciones.trim()),
+    // telefono y ubicacion viven en el modelo Usuario, no en Perfil
+    // → no los tenemos en el form, así que los leemos del perfil cargado
+    !!(perfil?.telefono),
+    !!(perfil?.ubicacion),
   ];
-  const completos = campos.filter(Boolean).length;
-  return Math.round((completos / campos.length) * 100);
+  const completados = campos.filter(Boolean).length;
+  return Math.round((completados / campos.length) * 100);
 }
 
 // Sección del formulario con encabezado
@@ -51,6 +87,9 @@ export default function PerfilPage() {
   const [msg, setMsg]           = useState('');
   const [cvFile, setCvFile]     = useState(null);
   const [subiendoCV, setSubiendoCV] = useState(false);
+  const [cartaFile, setCartaFile] = useState(null);
+  const [subiendoCarta, setSubiendoCarta] = useState(false);
+  const [fotoPreview, setFotoPreview] = useState('');
 
   const [form, setForm] = useState({
     // Campos existentes
@@ -65,7 +104,7 @@ export default function PerfilPage() {
     portfolio:               '',
     experienciaLaboral:      '',
     proyectos:               '',
-    certificaciones:         '',
+    certificaciones:         '',   // texto plano (una por línea), se convierte a array al guardar
     salarioPretendido:       '',
     preferenciasLaborales:   '',
     visibilidadPerfil:       'publica',
@@ -78,7 +117,16 @@ export default function PerfilPage() {
       .then(({ data }) => {
         const d = data.data || {};
         setPerfil(d);
-        setForm((prev) => ({ ...prev, ...d }));
+        setForm((prev) => ({
+          ...prev,
+          ...d,
+          // Convertir array de certificaciones a texto para el textarea
+          certificaciones: certToText(d.certificaciones),
+          // visibilidadPerfil: el backend devuelve boolean, el select usa string
+          visibilidadPerfil: d.visibilidadPerfil === false ? 'privada' : 'publica',
+        }));
+        // Inicializar preview de foto
+        if (d.fotoPerfil) setFotoPreview(d.fotoPerfil);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -86,6 +134,8 @@ export default function PerfilPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    // Actualizar preview de foto en tiempo real
+    if (name === 'fotoPerfil') setFotoPreview(value);
   };
 
   const handleGuardar = async (e) => {
@@ -93,13 +143,22 @@ export default function PerfilPage() {
     setMsg('');
     setGuardando(true);
     try {
-      const { data } = await userService.updatePerfil(form);
-      setPerfil(data.data);
+      // Preparar datos: certificaciones como array para el backend
+      const payload = {
+        ...form,
+        certificaciones: textToCert(form.certificaciones),
+      };
+      const { data } = await userService.updatePerfil(payload);
+      const perfilActualizado = data.data;
+      setPerfil(perfilActualizado);
       // Sincroniza fotoPerfil con el AuthContext si cambió
       if (form.fotoPerfil) actualizarUsuario({ fotoPerfil: form.fotoPerfil });
+      // Mantener preview actualizado
+      setFotoPreview(form.fotoPerfil || '');
       setMsg('✅ Perfil actualizado correctamente.');
-    } catch {
-      setMsg('❌ Error al guardar el perfil.');
+    } catch (err) {
+      const detalle = err?.response?.data?.message || '';
+      setMsg(`❌ Error al guardar el perfil.${detalle ? ' ' + detalle : ''}`);
     } finally {
       setGuardando(false);
       setTimeout(() => setMsg(''), 4000);
@@ -122,9 +181,28 @@ export default function PerfilPage() {
     }
   };
 
+  const handleSubirCarta = async () => {
+    if (!cartaFile) return;
+    setSubiendoCarta(true);
+    const formData = new FormData();
+    formData.append('carta', cartaFile);
+    try {
+      await userService.subirCartaRecomendacion(formData);
+      setMsg('✅ Carta de recomendación subida correctamente.');
+      // Recargar perfil para mostrar el nuevo link
+      const { data } = await userService.getPerfil();
+      setPerfil(data.data || {});
+    } catch {
+      setMsg('❌ Error al subir la carta de recomendación.');
+    } finally {
+      setSubiendoCarta(false);
+      setTimeout(() => setMsg(''), 4000);
+    }
+  };
+
   if (loading) return <p style={{ padding: '2rem' }}>Cargando perfil...</p>;
 
-  const pct = calcularCompletitud(form);
+  const pct = calcularCompletitud(form, perfil);
   const pctColor = pct < 40 ? '#ef4444' : pct < 75 ? '#f59e0b' : '#10b981';
 
   return (
@@ -205,6 +283,22 @@ export default function PerfilPage() {
             <label>URL de foto de perfil</label>
             <input name="fotoPerfil" value={form.fotoPerfil || ''} onChange={handleChange}
               placeholder="https://ejemplo.com/mi-foto.jpg" />
+            {fotoPreview && (
+              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <img
+                  src={fotoPreview}
+                  alt="Preview foto de perfil"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onLoad={(e) => { e.target.style.display = 'block'; }}
+                  style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    objectFit: 'cover', border: '2px solid var(--border)',
+                    display: 'none',
+                  }}
+                />
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Vista previa</span>
+              </div>
+            )}
           </div>
         </FormSection>
 
@@ -275,7 +369,7 @@ export default function PerfilPage() {
         </button>
       </form>
 
-      {/* ── 5. Currículum Vitae (mantenido) ─────────────────────────────── */}
+      {/* ── 5. Currículum Vitae ────────────────────────────────────────── */}
       <div className="cv-section">
         <h2>Currículum Vitae</h2>
         {perfil?.cvPath && (
@@ -302,6 +396,40 @@ export default function PerfilPage() {
         </div>
         <p className={styles.cvHint}>Solo archivos PDF. Máximo 5 MB.</p>
       </div>
+
+      {/* ── 6. Carta de Recomendación ─────────────────────────────────── */}
+      <div className="cv-section">
+        <h2>🎓 Carta de Recomendación</h2>
+        <p style={{ fontSize: '0.87rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+          Podés subir una carta de recomendación de un docente, empleador o entidad académica.
+          Es visible para las empresas cuando revisan tu perfil como candidato.
+        </p>
+        {perfil?.cartaRecomendacion && (
+          <p>
+            Carta actual:{' '}
+            <a href={`http://localhost:5000${perfil.cartaRecomendacion}`} target="_blank" rel="noreferrer">
+              📄 Ver carta actual
+            </a>
+          </p>
+        )}
+        <div className={styles.cvUpload}>
+          <input
+            id="carta-file"
+            type="file"
+            accept=".pdf,image/*"
+            onChange={(e) => setCartaFile(e.target.files[0])}
+          />
+          <button
+            className="btn-secondary"
+            onClick={handleSubirCarta}
+            disabled={!cartaFile || subiendoCarta}
+          >
+            {subiendoCarta ? 'Subiendo...' : '⬆️ Subir carta'}
+          </button>
+        </div>
+        <p className={styles.cvHint}>PDF o imagen (JPG, PNG). Máximo 5 MB.</p>
+      </div>
     </div>
   );
 }
+

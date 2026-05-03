@@ -110,10 +110,11 @@ export default function AlumnoDashboardPage() {
     total:        stats?.totalPostulaciones ?? stats?.total ?? 0,
     enRevision:   stats?.enRevision   ?? 0,
     entrevistas:  stats?.entrevistas  ?? 0,
-    contratados:  stats?.contratados  ?? 0,
-    perfilPct:    stats?.perfilCompletado ?? stats?.perfilPct ?? 0,
-    notifs:       stats?.notificacionesSinLeer ?? 0,
+    contratados:  stats?.contrataciones  ?? 0,
+    perfilPct:    stats?.perfilCompleto ?? stats?.perfilCompletado ?? stats?.perfilPct ?? 0,
+    notifs:       stats?.notificacionesNoLeidas ?? stats?.notificacionesSinLeer ?? 0,
   };
+
 
   return (
     <div className="page-container">
@@ -132,9 +133,6 @@ export default function AlumnoDashboardPage() {
         <div className={styles.headerActions}>
           <Link to="/ofertas" className="btn-primary">
             🔍 Ver ofertas
-          </Link>
-          <Link to="/perfil" className="btn-secondary">
-            ✏️ Mi perfil
           </Link>
         </div>
       </div>

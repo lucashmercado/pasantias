@@ -6,6 +6,7 @@
  * - v1.3: Aval (avales de profesores), Mensaje (chat directo)
  *         Notificacion añade prioridad, tipoVisual, accionURL
  * - v1.4: ActivityLog (auditoría de acciones del sistema)
+ * - v1.5: SolicitudEmpresa (solicitudes de registro pendientes de aprobación)
  */
 
 'use strict';
@@ -21,7 +22,9 @@ const Notificacion   = require('./notificacion.model')(sequelize);
 const EmpresaUsuario = require('./empresaUsuario.model')(sequelize);
 const Aval           = require('./aval.model')(sequelize);
 const Mensaje        = require('./mensaje.model')(sequelize);
-const ActivityLog    = require('./activityLog.model')(sequelize);  // v1.4
+const ActivityLog       = require('./activityLog.model')(sequelize);       // v1.4
+const SolicitudEmpresa  = require('./solicitudEmpresa.model')(sequelize);  // v1.5
+const SolicitudReclutador = require('./solicitudReclutador.model')(sequelize); // v1.7
 
 // ── Asociaciones — Perfil ─────────────────────────────────────────────────────
 Usuario.hasOne(Perfil, { foreignKey: 'usuarioId', as: 'perfil', onDelete: 'CASCADE' });
@@ -74,6 +77,11 @@ Mensaje.belongsTo(Usuario, { foreignKey: 'receptorId', as: 'receptor' });
 Usuario.hasMany(ActivityLog, { foreignKey: 'usuarioId', as: 'activityLogs', onDelete: 'SET NULL' });
 ActivityLog.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 
+// ── Asociaciones — SolicitudReclutador (v1.7) ─────────────────────────────────
+Empresa.hasMany(SolicitudReclutador, { foreignKey: 'empresaId', as: 'solicitudesReclutador', onDelete: 'CASCADE' });
+SolicitudReclutador.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
+
+
 // ── Exportaciones ─────────────────────────────────────────────────────────────
 module.exports = {
   sequelize,
@@ -87,4 +95,6 @@ module.exports = {
   Aval,             // v1.3 — avales de profesores
   Mensaje,          // v1.3 — chat directo entre usuarios
   ActivityLog,      // v1.4 — auditoría del sistema
+  SolicitudEmpresa, // v1.5 — solicitudes de registro de empresa
+  SolicitudReclutador, // v1.7 — solicitudes de alta de reclutador
 };

@@ -68,6 +68,10 @@ module.exports = (sequelize) => {
     // Ruta del archivo CV subido por el alumno (PDF almacenado en /uploads)
     cvPath: { type: DataTypes.STRING(255), allowNull: true },
 
+    // Ruta de la carta de recomendación (PDF o imagen) subida por el alumno
+    // Puede ser una referencia institucional, de docente o empleador anterior
+    cartaRecomendacion: { type: DataTypes.STRING(255), allowNull: true },
+
     // Ruta de la foto de perfil del alumno
     fotoPerfil: { type: DataTypes.STRING(255), allowNull: true },
 

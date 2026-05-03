@@ -60,7 +60,8 @@ app.use('/api/empresas',      require('./routes/empresa.routes'));      // Perfi
 app.use('/api/ofertas',       require('./routes/oferta.routes'));       // Publicaciones de pasantías
 app.use('/api/postulaciones', require('./routes/postulacion.routes')); // Postulaciones de alumnos
 app.use('/api/admin',         require('./routes/admin.routes'));        // Panel de administración
-app.use('/api/notificaciones',require('./routes/notificacion.routes'));// Notificaciones del sistema
+app.use('/api/notificaciones',    require('./routes/notificacion.routes'));     // Notificaciones del sistema
+app.use('/api/solicitudes-empresa', require('./routes/solicitudEmpresa.routes')); // v1.5 — Solicitudes de registro de empresa
 
 // ── Health Check ──────────────────────────────────────────────────────────────
 // Endpoint simple para verificar que el servidor está activo (útil para monitoreo)

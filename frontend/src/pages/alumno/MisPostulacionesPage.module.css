@@ -178,6 +178,28 @@
   flex-wrap: wrap;
 }
 
+/* Botón chat con reclutador */
+.btnChat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: linear-gradient(135deg, #0073AD, #58ACFA);
+  color: #fff;
+  font-family: var(--font-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(0,115,173,0.25);
+}
+
+.btnChat:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 .emptyState {
   display: flex;

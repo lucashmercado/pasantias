@@ -4,19 +4,35 @@
  * Maneja las operaciones CRUD sobre las ofertas publicadas por las empresas:
  * - Listar ofertas públicas con filtros
  * - Ver el detalle de una oferta específica
- * - Crear nuevas ofertas (solo empresas aprobadas)
- * - Actualizar una oferta existente (solo la empresa dueña)
- * - Cerrar/eliminar una oferta (solo la empresa dueña)
- * - Obtener ofertas recomendadas para el alumno autenticado [NUEVO]
+ * - Crear nuevas ofertas (empresas aprobadas: propietario, gerente, reclutador)
+ * - Actualizar una oferta existente (propietario, gerente, reclutador)
+ * - Cerrar/eliminar una oferta (propietario, gerente, reclutador)
+ * - Obtener ofertas recomendadas para el alumno autenticado
  *
  * Changelog:
  * - v1.1: agregado getOfertasRecomendadas (buscador inteligente por perfil del alumno)
+ * - v1.5: refactor multi-usuario — createOferta/updateOferta/deleteOferta usan
+ *         req.empresa del middleware con fallback a búsqueda por usuarioId
  */
 
 'use strict';
 
 const { Oferta, Empresa, Usuario, Perfil, Postulacion } = require('../models');
 const { Op } = require('sequelize');
+
+// ── Helper: resuelve la empresa desde el request ─────────────────────────────
+/**
+ * Prioriza req.empresa (inyectado por verifyEmpresaMember) y como fallback
+ * busca por usuarioId para compatibilidad con rutas que no usen el middleware.
+ *
+ * @param {Object} req - Request de Express
+ * @returns {Promise<Empresa|null>}
+ */
+async function _resolverEmpresa(req) {
+  if (req.empresa) return req.empresa;
+  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+}
+
 
 // ── Listar ofertas con filtros ────────────────────────────────────────────────
 /**
@@ -181,8 +197,7 @@ exports.getOfertaById = async (req, res) => {
  */
 exports.createOferta = async (req, res) => {
   try {
-    // Obtiene la empresa vinculada al usuario autenticado
-    const empresa = await Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+    const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(400).json({ success: false, message: 'No tenés empresa registrada.' });
 
     // Verifica que la empresa esté aprobada por el admin
@@ -205,8 +220,8 @@ exports.createOferta = async (req, res) => {
  */
 exports.updateOferta = async (req, res) => {
   try {
-    const empresa = await Empresa.findOne({ where: { usuarioId: req.usuario.id } });
-    // Verifica que la oferta pertenezca a esta empresa antes de permitir la edición
+    const empresa = await _resolverEmpresa(req);
+    if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
     const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
     if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
@@ -226,7 +241,8 @@ exports.updateOferta = async (req, res) => {
  */
 exports.deleteOferta = async (req, res) => {
   try {
-    const empresa = await Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+    const empresa = await _resolverEmpresa(req);
+    if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
     const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
     if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 

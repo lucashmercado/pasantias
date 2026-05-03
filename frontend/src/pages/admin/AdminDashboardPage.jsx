@@ -121,13 +121,24 @@ export default function AdminDashboardPage() {
     setOfertasPendientes((prev) => prev.filter((o) => o.id !== id));
   };
 
-  /* Datos para el gráfico */
-  const chartData = stats ? [
-    { name: 'Alumnos',       valor: stats.alumnosActivos  ?? stats.totalUsuarios   ?? 0 },
-    { name: 'Empresas',      valor: stats.empresasActivas ?? stats.totalEmpresas    ?? 0 },
-    { name: 'Ofertas',       valor: stats.ofertasActivas  ?? stats.totalOfertas     ?? 0 },
-    { name: 'Postulaciones', valor: stats.postulaciones   ?? stats.totalPostulaciones ?? 0 },
-    { name: 'Contratados',   valor: stats.contrataciones  ?? stats.contratados       ?? 0 },
+  /* Datos para el gráfico — aplanar estructura anidada del backend
+   * El nuevo endpoint devuelve: { usuarios: {...}, pasantias: {...} }
+   * El legacy devuelve todo en el root level */
+  const s = stats ? {
+    alumnosActivos:  stats.alumnosActivos  ?? stats.usuarios?.alumnosActivos  ?? stats.totalUsuarios   ?? 0,
+    empresasActivas: stats.empresasActivas ?? stats.usuarios?.empresasAprobadas ?? stats.totalEmpresas  ?? 0,
+    ofertasActivas:  stats.ofertasActivas  ?? stats.pasantias?.ofertasActivas  ?? stats.totalOfertas    ?? 0,
+    postulaciones:   stats.postulaciones   ?? stats.pasantias?.totalPostulaciones ?? stats.totalPostulaciones ?? 0,
+    contrataciones:  stats.contrataciones  ?? stats.pasantias?.contrataciones  ?? stats.contratados     ?? 0,
+    tasaInsercion:   stats.tasaInsercion   ?? stats.pasantias?.tasaInsercion   ?? '0%',
+  } : null;
+
+  const chartData = s ? [
+    { name: 'Alumnos',       valor: s.alumnosActivos },
+    { name: 'Empresas',      valor: s.empresasActivas },
+    { name: 'Ofertas',       valor: s.ofertasActivas },
+    { name: 'Postulaciones', valor: s.postulaciones },
+    { name: 'Contratados',   valor: s.contrataciones },
   ] : [];
 
   return (
@@ -135,8 +146,9 @@ export default function AdminDashboardPage() {
       <div className="dashboard-header">
         <h1>Panel de Administración</h1>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <Link to="/admin/usuarios" className="btn-primary">👥 Gestionar Usuarios</Link>
-          <Link to="/admin/logs"     className="btn-secondary">📋 Ver Logs</Link>
+          <Link to="/admin/solicitudes" className="btn-primary">📋 Solicitudes de Empresa</Link>
+          <Link to="/admin/usuarios"   className="btn-secondary">👥 Usuarios</Link>
+          <Link to="/admin/logs"       className="btn-secondary">🗒️ Logs</Link>
         </div>
       </div>
 
@@ -149,17 +161,10 @@ export default function AdminDashboardPage() {
             <div key={m.key} className={styles.skeletonCard} />
           ))}
         </div>
-      ) : stats && (
+      ) : s && (
         <div className={styles.statsGrid}>
           {METRIC_DEFS.map(({ key, label, icon, color, highlight }) => {
-            const rawVal = stats[key] ?? stats[{
-              alumnosActivos:  'totalUsuarios',
-              empresasActivas: 'totalEmpresas',
-              ofertasActivas:  'totalOfertas',
-              postulaciones:   'totalPostulaciones',
-              contrataciones:  'contratados',
-              tasaInsercion:   'tasaInsercion',
-            }[key]];
+            const rawVal = s[key];
             return (
               <div
                 key={key}
@@ -176,7 +181,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* ── Gráfico de barras ─────────────────────────────────────────────── */}
-      {!loading && chartData.length > 0 && (
+      {!loading && chartData.length > 0 && s && (
         <div className={styles.chartContainer}>
           <h2>Métricas del sistema</h2>
           <ResponsiveContainer width="100%" height={280}>
@@ -201,16 +206,6 @@ export default function AdminDashboardPage() {
           </ResponsiveContainer>
         </div>
       )}
-
-      {/* ── Actividad reciente ─────────────────────────────────────────────── */}
-      <section className={styles.adminSection}>
-        <h2>Actividad Reciente</h2>
-        {loading ? (
-          <p className="msg">Cargando actividad...</p>
-        ) : (
-          <ActividadFeed actividad={actividad} />
-        )}
-      </section>
 
       {/* ── Empresas pendientes ────────────────────────────────────────────── */}
       <section className={styles.adminSection}>

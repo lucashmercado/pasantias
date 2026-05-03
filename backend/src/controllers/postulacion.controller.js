@@ -17,7 +17,19 @@
 
 'use strict';
 
-const { Postulacion, Oferta, Usuario, Perfil, Empresa, Notificacion, Aval } = require('../models');
+const { Postulacion, Oferta, Usuario, Perfil, Empresa, Notificacion, Aval, ActivityLog } = require('../models');
+
+// Helper: resuelve la empresa desde req.empresa (middleware) o por usuarioId (fallback)
+async function _resolverEmpresa(req) {
+  if (req.empresa) return req.empresa;
+  return Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+}
+
+
+// Helper para registrar acciones en el log sin interrumpir el flujo principal
+async function logAction(datos) {
+  try { await ActivityLog.create(datos); } catch (e) { /* Fallo silencioso */ }
+}
 
 // ── Postularse ────────────────────────────────────────────────────────────────
 /**
@@ -97,6 +109,16 @@ exports.postular = async (req, res) => {
       enlace: `/empresa/postulaciones/${postulacion.id}`,
     });
 
+    // Registra la postulación en el log de auditoría (antes del return)
+    logAction({
+      usuarioId: req.usuario.id,
+      accion: 'postular',
+      entidad: 'postulacion',
+      entidadId: postulacion.id,
+      detalle: { ofertaId, ofertaTitulo: oferta.titulo, empresa: oferta.empresa?.razonSocial },
+      ip: req.ip,
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Postulación enviada correctamente.',
@@ -172,8 +194,7 @@ exports.getMisPostulaciones = async (req, res) => {
  */
 exports.getPostulacionesByOferta = async (req, res) => {
   try {
-    // Verifica que la empresa logueada sea dueña de la oferta solicitada
-    const empresa = await Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+    const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(403).json({ success: false, message: 'No tenés un perfil de empresa activo.' });
 
     const oferta = await Oferta.findOne({ where: { id: req.params.ofertaId, empresaId: empresa.id } });
@@ -295,8 +316,8 @@ exports.updateEstado = async (req, res) => {
 
     if (!postulacion) return res.status(404).json({ success: false, message: 'Postulación no encontrada.' });
 
-    // Verifica que la empresa logueada sea dueña de la oferta de esta postulación
-    const empresa = await Empresa.findOne({ where: { usuarioId: req.usuario.id } });
+    const empresa = await _resolverEmpresa(req);
+    if (!empresa) return res.status(403).json({ success: false, message: 'No tenés un perfil de empresa activo.' });
     if (postulacion.oferta.empresaId !== empresa.id) {
       return res.status(403).json({ success: false, message: 'No tenés permiso para modificar esta postulación.' });
     }
@@ -327,6 +348,18 @@ exports.updateEstado = async (req, res) => {
         mensaje: `Tu postulación para "${postulacion.oferta.titulo}" cambió a: ${estado.replace(/_/g, ' ')}.`,
         tipo: 'estado',
         enlace: `/mis-postulaciones/${postulacion.id}`,
+      });
+    }
+
+    // Registra el cambio de estado en el log de auditoría
+    if (estado) {
+      logAction({
+        usuarioId: req.usuario.id,
+        accion: 'cambiar_estado_postulacion',
+        entidad: 'postulacion',
+        entidadId: postulacion.id,
+        detalle: { nuevoEstado: estado, oferta: postulacion.oferta?.titulo },
+        ip: req.ip,
       });
     }
 

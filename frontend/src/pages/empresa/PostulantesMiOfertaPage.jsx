@@ -1,16 +1,13 @@
 /**
- * PostulantesMiOfertaPage.jsx — Vista de candidatos de una oferta específica.
+ * PostulantesMiOfertaPage.jsx — Vista de candidatos de una oferta.
  *
- * Muestra para cada postulante:
- * - Nombre, email y datos de perfil
- * - Barra de compatibilidad con la oferta (compatibilidadOferta %)
- * - Botón para descargar el CV
- * - Historial académico (carrera, institución, año de egreso)
- * - Disponibilidad horaria/inicio
- * - Carta de presentación (desplegable)
- * - Selector de estado (PATCH /api/postulaciones/:id/estado)
+ * Ruta: /empresa/postulantes/:ofertaId
  *
- * Estados soportados: en_revision, preseleccionado, entrevista, contratado, rechazado
+ * Muestra la lista completa de postulantes con:
+ * - Filtro por estado
+ * - Selector de estado inline (dropdown) para avanzar candidatos
+ * - CV descargable, carta de presentación y badge de aval
+ * - Stats rápidas (total, en proceso, contratados)
  */
 
 import { useState, useEffect } from 'react';
@@ -18,269 +15,247 @@ import { useParams, Link } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
 import styles from './PostulantesMiOfertaPage.module.css';
 
-/* Estados válidos del nuevo backend corporativo */
+/* ── Configuración de estados ────────────────────────────────────────────────── */
 const ESTADOS = [
-  { value: 'en_revision',    label: 'En revisión' },
-  { value: 'preseleccionado', label: 'Preseleccionado' },
-  { value: 'entrevista',     label: 'Entrevista' },
-  { value: 'contratado',     label: 'Contratado' },
-  { value: 'rechazado',      label: 'Rechazado' },
+  { estado: 'en_revision',           label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
+  { estado: 'preseleccionado',       label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
+  { estado: 'entrevista_programada', label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
+  { estado: 'contratado',            label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
+  { estado: 'no_seleccionado',       label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
 ];
 
-/* Colores de badge según estado */
-const ESTADO_COLOR = {
-  en_revision:    '#7f8c8d',
-  preseleccionado: '#2980b9',
-  entrevista:     '#8e44ad',
-  contratado:     '#27ae60',
-  rechazado:      '#c0392b',
-};
+const ESTADO_MAP = Object.fromEntries(ESTADOS.map(e => [e.estado, e]));
 
-/** Barra de compatibilidad visual */
-function CompatibilidadBar({ valor }) {
-  const pct  = Math.min(Math.max(Number(valor) || 0, 0), 100);
-  const color = pct >= 75 ? '#27ae60' : pct >= 50 ? '#e67e22' : '#c0392b';
+function formatFecha(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/* ── Badge de aval ───────────────────────────────────────────────────────────── */
+function AvalBadge({ avales = [] }) {
+  if (!avales?.length) return (
+    <span className={styles.avalBadge} style={{ background: '#f1f5f9', color: '#94a3b8' }}>Sin aval</span>
+  );
+  const aprobado  = avales.find(a => a.estado === 'aprobado');
+  const pendiente = avales.find(a => a.estado === 'pendiente');
+  if (aprobado)  return <span className={styles.avalBadge} style={{ background: '#dcfce7', color: '#16a34a' }}>🎓 Aval aprobado</span>;
+  if (pendiente) return <span className={styles.avalBadge} style={{ background: '#fef9c3', color: '#ca8a04' }}>⏳ Aval pendiente</span>;
+  return <span className={styles.avalBadge} style={{ background: '#fee2e2', color: '#dc2626' }}>✕ Aval rechazado</span>;
+}
+
+/* ── Barra de compatibilidad ─────────────────────────────────────────────────── */
+function CompatBar({ valor }) {
+  const pct   = Math.min(Math.max(Number(valor) || 0, 0), 100);
+  const color = pct >= 75 ? '#16a34a' : pct >= 50 ? '#ea580c' : '#dc2626';
   return (
     <div className={styles.compatWrap}>
-      <span className={styles.compatLabel}>Compatibilidad</span>
       <div className={styles.compatBar}>
-        <div
-          className={styles.compatFill}
-          style={{ width: `${pct}%`, background: color }}
-        />
+        <div className={styles.compatFill} style={{ width: `${pct}%`, background: color }} />
       </div>
       <span className={styles.compatPct} style={{ color }}>{pct}%</span>
     </div>
   );
 }
 
-/** Badge de aval académico visible para la empresa */
-function AvalBadge({ avales = [] }) {
-  if (!avales || avales.length === 0) {
-    return (
-      <div className={styles.avalBadge} style={{ '--aval-bg': '#f4f6f8', '--aval-color': '#95a5a6', '--aval-border': '#dde1e4' }}>
-        <span>🎓</span>
-        <span>Sin aval académico</span>
-      </div>
-    );
-  }
-
-  // Prioridad: aprobado > pendiente > rechazado
-  const aprobado  = avales.find((a) => a.estado === 'aprobado');
-  const pendiente = avales.find((a) => a.estado === 'pendiente');
-
-  if (aprobado) {
-    return (
-      <div className={styles.avalBadge} style={{ '--aval-bg': '#eafaf1', '--aval-color': '#1e8449', '--aval-border': '#a9dfbf' }}>
-        <span>🎓</span>
-        <div>
-          <strong>Aval académico aprobado</strong>
-          {aprobado.profesor && (
-            <small>Prof. {aprobado.profesor.nombre} {aprobado.profesor.apellido}</small>
-          )}
-          {aprobado.comentario && (
-            <em>"{aprobado.comentario}"</em>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (pendiente) {
-    return (
-      <div className={styles.avalBadge} style={{ '--aval-bg': '#fef9ec', '--aval-color': '#d68910', '--aval-border': '#f9e4a0' }}>
-        <span>⏳</span>
-        <div>
-          <strong>Aval pendiente</strong>
-          {pendiente.profesor && (
-            <small>Esperando respuesta del Prof. {pendiente.profesor.nombre} {pendiente.profesor.apellido}</small>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Solo avales rechazados
-  return (
-    <div className={styles.avalBadge} style={{ '--aval-bg': '#fdf2f2', '--aval-color': '#922b21', '--aval-border': '#f1948a' }}>
-      <span>✕</span>
-      <span>Aval rechazado</span>
-    </div>
-  );
-}
-
+/* ══════════════════════════════════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL
+══════════════════════════════════════════════════════════════════════════════ */
 export default function PostulantesMiOfertaPage() {
   const { ofertaId } = useParams();
+
   const [postulaciones, setPostulaciones] = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState('');
-  const [filtroEstado,  setFiltroEstado]  = useState('');
+  const [filtro,        setFiltro]        = useState('');
+  const [toast,         setToast]         = useState('');
+
+  const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
   useEffect(() => {
     postulacionService
       .getByOferta(ofertaId)
       .then(({ data }) => setPostulaciones(data.data ?? data ?? []))
-      .catch((err) => {
-        const msg = err.response?.data?.detail ?? err.response?.data?.message ?? 'Error al cargar los candidatos.';
-        setError(msg);
-        console.error('getByOferta error:', err.response?.data ?? err.message);
-      })
+      .catch(err => setError(err.response?.data?.message ?? 'Error al cargar los candidatos.'))
       .finally(() => setLoading(false));
   }, [ofertaId]);
 
-  const handleCambiarEstado = async (id, estado) => {
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
+
+  const handleCambiarEstado = async (id, nuevoEstado) => {
+    // Actualización optimista
+    setPostulaciones(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
     try {
-      await postulacionService.updateEstado(id, estado);
-      setPostulaciones(postulaciones.map((p) => (p.id === id ? { ...p, estado } : p)));
-    } catch (err) {
-      alert('Error al cambiar el estado de la postulación.');
+      await postulacionService.updateEstado(id, nuevoEstado);
+      const e = ESTADO_MAP[nuevoEstado];
+      showToast(`${e?.emoji ?? ''} Candidato movido a "${e?.label ?? nuevoEstado}"`);
+    } catch {
+      showToast('✗ Error al cambiar el estado.');
     }
   };
 
-  const postulacionesFiltradas = filtroEstado
-    ? postulaciones.filter((p) => p.estado === filtroEstado)
+  const filtradas = filtro
+    ? postulaciones.filter(p => p.estado === filtro)
     : postulaciones;
 
-  if (loading) return <p className="msg" style={{ padding: '2rem' }}>Cargando candidatos...</p>;
+  const total       = postulaciones.length;
+  const activos     = postulaciones.filter(p => !['no_seleccionado'].includes(p.estado)).length;
+  const contratados = postulaciones.filter(p => p.estado === 'contratado').length;
 
   return (
     <div className="page-container">
-      {/* ── Cabecera ─────────────────────────────────────────────────────── */}
-      <div className="dashboard-header">
-        <div>
+
+      {/* ── Cabecera ──────────────────────────────────────────────────────── */}
+      <div className={styles.pageHeader}>
+        <div className={styles.pageHeaderLeft}>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
-          <h1>Candidatos Postulados</h1>
+          <h1>Candidatos</h1>
+          <p className={styles.pageSubtitle}>
+            Revisá y gestioná los postulantes a esta oferta.
+          </p>
         </div>
-        <span className={`badge badge-activa`} style={{ alignSelf: 'flex-end' }}>
-          {postulaciones.length} postulación{postulaciones.length !== 1 ? 'es' : ''}
-        </span>
+
+        {/* Stats rápidas */}
+        <div className={styles.headerStats}>
+          <div className={styles.statPill}>
+            <span className={styles.statNum}>{total}</span>
+            <span>Total</span>
+          </div>
+          <div className={styles.statPill}>
+            <span className={styles.statNum} style={{ color: '#2563eb' }}>{activos}</span>
+            <span>En proceso</span>
+          </div>
+          <div className={styles.statPill}>
+            <span className={styles.statNum} style={{ color: '#16a34a' }}>{contratados}</span>
+            <span>Contratados</span>
+          </div>
+        </div>
       </div>
 
-      {/* Error de carga */}
-      {error && (
-        <div className="error-msg" style={{ marginBottom: '1.5rem', padding: '1rem 1.25rem', borderRadius: 'var(--radius)' }}>
-          ⚠️ {error}
+      {/* ── Error ─────────────────────────────────────────────────────────── */}
+      {error && <p className={styles.errorMsg}>{error}</p>}
+
+      {/* ── Loading ───────────────────────────────────────────────────────── */}
+      {loading && (
+        <div className={styles.skeletonKanban}>
+          {[1,2,3].map(i => <div key={i} className={styles.skeletonCol} />)}
         </div>
       )}
 
-      {/* ── Filtro de estado ─────────────────────────────────────────────── */}
-      <div className={styles.filtroBar}>
-        <label>Filtrar por estado:</label>
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value)}
-          className={styles.filtroSelect}
-        >
-          <option value="">Todos</option>
-          {ESTADOS.map((e) => (
-            <option key={e.value} value={e.value}>{e.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* ── Lista de candidatos ──────────────────────────────────────────── */}
-      {postulacionesFiltradas.length === 0 ? (
+      {/* ── Estado vacío ──────────────────────────────────────────────────── */}
+      {!loading && total === 0 && (
         <div className={styles.emptyState}>
           <span>📭</span>
-          <p>No hay candidatos{filtroEstado ? ` con estado "${filtroEstado}"` : ' para esta oferta'}.</p>
-        </div>
-      ) : (
-        <div className="candidatos-list">
-          {postulacionesFiltradas.map((p) => {
-            const perfil    = p.usuario?.perfil ?? {};
-            const cvUrl     = perfil.cvPath
-              ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${perfil.cvPath}`
-              : null;
-
-            return (
-              <div key={p.id} className={`candidato-card ${styles.candidatoCard}`}>
-
-                {/* ── Info izquierda ──────────────────────────────────────── */}
-                <div className="candidato-info">
-                  {/* Nombre + estado actual */}
-                  <div className={styles.candidatoHeader}>
-                    <h3>{p.usuario?.nombre} {p.usuario?.apellido}</h3>
-                    <span
-                      className="badge"
-                      style={{ background: ESTADO_COLOR[p.estado] ?? '#7f8c8d' }}
-                    >
-                      {ESTADOS.find((e) => e.value === p.estado)?.label ?? p.estado}
-                    </span>
-                  </div>
-
-                  {/* Email */}
-                  <p>✉️ {p.usuario?.email}</p>
-
-                  {/* Compatibilidad */}
-                  {p.compatibilidadOferta != null && (
-                    <CompatibilidadBar valor={p.compatibilidadOferta} />
-                  )}
-
-                  {/* Historial académico */}
-                  {(perfil.carrera || perfil.institucion || perfil.anioEgreso) && (
-                    <div className={styles.academicBox}>
-                      <span className={styles.academicTitle}>🎓 Historial académico</span>
-                      {perfil.carrera     && <span>{perfil.carrera}</span>}
-                      {perfil.institucion && <span>{perfil.institucion}</span>}
-                      {perfil.anioEgreso  && <span>Egresado en {perfil.anioEgreso}</span>}
-                    </div>
-                  )}
-
-                  {/* Disponibilidad */}
-                  {perfil.disponibilidad && (
-                    <p>🕐 <strong>Disponibilidad:</strong> {perfil.disponibilidad}</p>
-                  )}
-
-                  {/* Área de interés */}
-                  {perfil.areaInteres && <p>💼 {perfil.areaInteres}</p>}
-
-                  {/* ── Aval académico ───────────────────────────────────── */}
-                  <AvalBadge avales={p.avales ?? []} />
-
-                  {/* Botón descargar CV */}
-                  {cvUrl ? (
-                    <a
-                      href={cvUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      download
-                      className="btn-small"
-                      style={{ marginTop: '0.5rem' }}
-                    >
-                      📄 Descargar CV
-                    </a>
-                  ) : (
-                    <span className={styles.sinCv}>Sin CV cargado</span>
-                  )}
-
-                  {/* Carta de presentación */}
-                  {p.cartaPresentacion && (
-                    <details className={styles.cartaDetails}>
-                      <summary>📝 Carta de presentación</summary>
-                      <p>{p.cartaPresentacion}</p>
-                    </details>
-                  )}
-                </div>
-
-                {/* ── Selector de estado (lado derecho) ─────────────────── */}
-                <div className="candidato-estado">
-                  <label className={styles.estadoLabel}>Cambiar estado</label>
-                  <select
-                    value={p.estado}
-                    onChange={(e) => handleCambiarEstado(p.id, e.target.value)}
-                    className="select-estado"
-                    style={{ borderColor: ESTADO_COLOR[p.estado] ?? 'var(--border)' }}
-                  >
-                    {ESTADOS.map((e) => (
-                      <option key={e.value} value={e.value}>{e.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })}
+          <p>No hay postulantes para esta oferta todavía.</p>
         </div>
       )}
+
+      {/* ── Lista de candidatos ───────────────────────────────────────────── */}
+      {!loading && total > 0 && (
+        <>
+          {/* Filtros por estado */}
+          <div className={styles.filtroBar}>
+            <label>Filtrar:</label>
+            <div className={styles.filtroChips}>
+              <button
+                className={`${styles.filtroChip} ${!filtro ? styles.filtroChipActive : ''}`}
+                onClick={() => setFiltro('')}
+              >
+                Todos ({total})
+              </button>
+              {ESTADOS.map(e => {
+                const n = postulaciones.filter(p => p.estado === e.estado).length;
+                if (!n) return null;
+                return (
+                  <button
+                    key={e.estado}
+                    className={`${styles.filtroChip} ${filtro === e.estado ? styles.filtroChipActive : ''}`}
+                    style={filtro === e.estado ? { borderColor: e.color, background: e.bg, color: e.color } : {}}
+                    onClick={() => setFiltro(filtro === e.estado ? '' : e.estado)}
+                  >
+                    {e.emoji} {e.label} ({n})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtradas.length === 0 ? (
+            <div className={styles.emptyState}>
+              <span>📭</span>
+              <p>No hay candidatos con ese estado.</p>
+            </div>
+          ) : (
+            <div className={styles.listaCards}>
+              {filtradas.map(p => {
+                const perfil = p.usuario?.perfil ?? {};
+                const cvUrl  = perfil.cvPath ? `${BASE_URL}${perfil.cvPath}` : null;
+                const col    = ESTADO_MAP[p.estado];
+                return (
+                  <div key={p.id} className={styles.candidatoCard}>
+                    {/* Estado lateral */}
+                    <div className={styles.estadoLateral} style={{ background: col?.color ?? '#64748b' }}>
+                      <span>{col?.emoji}</span>
+                    </div>
+
+                    {/* Info principal */}
+                    <div className={styles.candidatoBody}>
+                      <div className={styles.candidatoTop}>
+                        <div className={styles.candidatoAvatar} style={{ background: col?.color ?? '#64748b' }}>
+                          {(p.usuario?.nombre?.[0] ?? '?').toUpperCase()}
+                        </div>
+                        <div className={styles.candidatoInfo}>
+                          <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                          <span>{p.usuario?.email}</span>
+                          {perfil.carrera && <span className={styles.carrera}>{perfil.carrera}</span>}
+                        </div>
+                        <div className={styles.candidatoMeta}>
+                          <AvalBadge avales={p.avales} />
+                          {p.compatibilidadOferta != null && <CompatBar valor={p.compatibilidadOferta} />}
+                          <span className={styles.fechaPost}>📅 {formatFecha(p.fechaPostulacion)}</span>
+                        </div>
+                      </div>
+
+                      {/* Extras */}
+                      <div className={styles.candidatoExtras}>
+                        {cvUrl ? (
+                          <a href={cvUrl} target="_blank" rel="noreferrer" download className={styles.btnCv}>
+                            📄 Descargar CV
+                          </a>
+                        ) : (
+                          <span className={styles.sinCv}>Sin CV</span>
+                        )}
+                        {p.cartaPresentacion && (
+                          <details className={styles.carta}>
+                            <summary>📝 Carta de presentación</summary>
+                            <p>{p.cartaPresentacion}</p>
+                          </details>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Selector de estado */}
+                    <div className={styles.selectorEstado}>
+                      <label>Estado</label>
+                      <select
+                        value={p.estado}
+                        onChange={e => handleCambiarEstado(p.id, e.target.value)}
+                        style={{ borderColor: col?.color ?? 'var(--border)' }}
+                      >
+                        {ESTADOS.map(e => (
+                          <option key={e.estado} value={e.estado}>{e.emoji} {e.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Toast ─────────────────────────────────────────────────────────── */}
+      {toast && <div className={styles.toast}>{toast}</div>}
     </div>
   );
 }

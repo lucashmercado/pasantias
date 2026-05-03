@@ -21,8 +21,8 @@ const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const ctrl = require('../controllers/profesor.controller');
 
-// Solo profesores pueden acceder a estas rutas
-const soloProfesor = [verifyToken, authorizeRoles('profesor')];
+// Profesores y admins pueden acceder al panel del profesor
+const soloProfesor = [verifyToken, authorizeRoles('profesor', 'admin')];
 // Cualquier usuario autenticado puede listar profesores y solicitar avales
 const autenticado  = [verifyToken];
 

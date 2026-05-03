@@ -88,8 +88,10 @@ export default function Navbar() {
   ];
 
   const linksAdmin = [
-    { to: '/admin',    label: 'Administración' },
-    { to: '/profesor', label: 'Panel Profesor' },
+    { to: '/admin',             label: 'Dashboard' },
+    { to: '/admin/solicitudes', label: '📋 Solicitudes' },
+    { to: '/admin/usuarios',    label: '👥 Usuarios' },
+    { to: '/admin/logs',        label: 'Logs' },
   ];
 
   const getLinks = () => {
@@ -105,10 +107,16 @@ export default function Navbar() {
 
   const links = getLinks();
 
-  const esActivo = (to) =>
-    to === '/'
-      ? location.pathname === '/'
-      : location.pathname === to || location.pathname.startsWith(to + '/');
+  const esActivo = (to) => {
+    if (to === '/') return location.pathname === '/';
+    // Exact match primero
+    if (location.pathname === to) return true;
+    // Solo usar startsWith para rutas con parámetros dinámicos (contienen ':')
+    // Ej: /empresa/postulantes/:ofertaId — el link es /empresa/postulantes
+    if (to.endsWith('/:') || to.includes('/:')) return location.pathname.startsWith(to.split('/:')[0]);
+    return false;
+  };
+
 
   /* ── Color del badge de notificaciones según prioridad ───────────────── */
   const notifColor = prioridadAlta

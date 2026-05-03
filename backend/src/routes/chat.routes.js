@@ -5,14 +5,15 @@
  *
  * Todas las rutas requieren autenticación (cualquier rol).
  *
- * ⚠️ ORDEN IMPORTANTE: '/leer' y rutas fijas deben ir ANTES de '/:usuarioId'
- *    para que Express no interprete la palabra como parámetro.
+ * ⚠️ ORDEN IMPORTANTE: rutas fijas (/usuarios, /:usuarioId/leer) deben ir
+ *    ANTES de '/:usuarioId' para que Express no las trate como parámetro.
  *
  * Rutas disponibles:
+ * - GET   /usuarios               → Buscar usuarios para iniciar chat (q=texto)
  * - GET   /                       → Lista de conversaciones del usuario autenticado
  * - POST  /                       → Enviar un mensaje a otro usuario
- * - GET   /:usuarioId             → Historial con un usuario (marca como leído)
  * - PATCH /:usuarioId/leer        → Marcar conversación como leída manualmente
+ * - GET   /:usuarioId             → Historial con un usuario (marca como leído)
  */
 
 'use strict';
@@ -23,6 +24,10 @@ const ctrl = require('../controllers/chat.controller');
 
 // Todos los endpoints de chat requieren estar autenticado (cualquier rol)
 router.use(verifyToken);
+
+// GET  /api/chat/usuarios?q=texto — Busca usuarios para iniciar un nuevo chat
+// ⚠️ Debe ir ANTES de GET /:usuarioId para que Express no confunda 'usuarios' con un ID
+router.get('/usuarios', ctrl.buscarUsuarios);
 
 // GET  /api/chat — Lista de conversaciones con último mensaje y no leídos
 router.get('/', ctrl.getConversaciones);

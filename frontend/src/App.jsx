@@ -12,10 +12,9 @@
  * - Protegidas: requieren autenticación, con control de roles
  *
  * Roles soportados y redirección raíz:
- * - admin    → /admin
- * - empresa  → /empresa
- * - profesor → /profesor
- * - alumno   → /dashboard  (también egresado)
+ * - admin   → /admin
+ * - empresa → /empresa
+ * - alumno  → /dashboard  (también egresado)
  * - egresado → /dashboard
  */
 
@@ -27,6 +26,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import SolicitudEmpresaPage from './pages/auth/SolicitudEmpresaPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 
@@ -42,15 +42,13 @@ import EmpresaDashboardPage from './pages/empresa/EmpresaDashboardPage';
 import CrearOfertaPage from './pages/empresa/CrearOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
 import EquipoPage from './pages/empresa/EquipoPage';
+import SeguridadPage from './pages/empresa/SeguridadPage';
 
 // Página del administrador (requiere rol admin)
 import AdminDashboardPage  from './pages/admin/AdminDashboardPage';
-import AdminUsuariosPage   from './pages/admin/AdminUsuariosPage';   // v1.4
-import AdminLogsPage       from './pages/admin/AdminLogsPage';        // v1.4
-
-// Páginas del profesor (requieren rol profesor o admin)
-import ProfesorDashboardPage from './pages/profesor/ProfesorDashboardPage';
-import ProfesorAvalesPage from './pages/profesor/ProfesorAvalesPage';
+import AdminUsuariosPage   from './pages/admin/AdminUsuariosPage';
+import AdminLogsPage       from './pages/admin/AdminLogsPage';
+import AdminSolicitudesPage from './pages/admin/AdminSolicitudesPage';
 
 // Página de chat/mensajería (todos los roles autenticados)
 import ChatPage from './pages/ChatPage';
@@ -107,7 +105,6 @@ function getRutaInicio(rol) {
   switch (rol) {
     case 'admin':    return '/admin';
     case 'empresa':  return '/empresa';
-    case 'profesor': return '/profesor';
     case 'alumno':
     case 'egresado':
     default:         return '/dashboard';
@@ -119,9 +116,8 @@ function getRutaInicio(rol) {
  *
  * La ruta raíz "/" redirige automáticamente según el rol del usuario:
  * - Sin sesión → HomePage (landing pública)
- * - admin    → /admin
- * - empresa  → /empresa
- * - profesor → /profesor
+ * - admin   → /admin
+ * - empresa → /empresa
  * - alumno/egresado → /dashboard
  */
 function AppRoutes() {
@@ -139,6 +135,7 @@ function AppRoutes() {
       {/* ── Rutas públicas (solo para usuarios no autenticados) ── */}
       <Route path="/login"    element={!usuario ? <LoginPage />    : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
       <Route path="/register" element={!usuario ? <RegisterPage /> : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
+      <Route path="/registro-empresa" element={!usuario ? <SolicitudEmpresaPage /> : <Navigate to={getRutaInicio(usuario.rol)} replace />} />
       <Route path="/forgot-password"        element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token"  element={<ResetPasswordPage />} />
 
@@ -191,34 +188,27 @@ function AppRoutes() {
           <EquipoPage />
         </ProtectedRoute>
       } />
-
-      {/* ── Rutas del profesor ── */}
-      <Route path="/profesor" element={
-        <ProtectedRoute roles={['profesor', 'admin']}>
-          <ProfesorDashboardPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/profesor/avales" element={
-        <ProtectedRoute roles={['profesor', 'admin']}>
-          <ProfesorAvalesPage />
+      <Route path="/empresa/seguridad" element={
+        <ProtectedRoute roles={['empresa']}>
+          <SeguridadPage />
         </ProtectedRoute>
       } />
 
-      {/* ── Chat / Mensajería (todos los roles autenticados) ── */}
+      {/* ── Chat / Mensajería (alumno, egresado y empresa) ── */}
       <Route path="/chat" element={
-        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'profesor', 'admin']}>
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
           <ChatPage />
         </ProtectedRoute>
       } />
       <Route path="/chat/:usuarioId" element={
-        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'profesor', 'admin']}>
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
           <ChatPage />
         </ProtectedRoute>
       } />
 
       {/* ── Notificaciones (todos los roles autenticados) ── */}
       <Route path="/notificaciones" element={
-        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'profesor', 'admin']}>
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa', 'admin']}>
           <NotificacionesPage />
         </ProtectedRoute>
       } />
@@ -237,6 +227,11 @@ function AppRoutes() {
       <Route path="/admin/logs" element={
         <ProtectedRoute roles={['admin']}>
           <AdminLogsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/solicitudes" element={
+        <ProtectedRoute roles={['admin']}>
+          <AdminSolicitudesPage />
         </ProtectedRoute>
       } />
 

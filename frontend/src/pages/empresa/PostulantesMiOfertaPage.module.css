@@ -1,214 +1,507 @@
-/* ── PostulantesMiOfertaPage.module.css ──────────────────────────────────── */
+/* ── PostulantesMiOfertaPage.module.css ─────────────────────────────────────── */
 
-/* Cabecera mejorada del candidato: nombre + badge de estado en la misma línea */
-.candidatoCard {
-  flex-direction: column;
-  gap: 1rem;
+/* ── Cabecera ────────────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
 }
 
-@media (min-width: 700px) {
-  .candidatoCard {
-    flex-direction: row;
-    align-items: flex-start;
-  }
+.pageHeaderLeft h1 { margin: 0.15rem 0 0; }
+
+.pageSubtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0;
 }
 
-.candidatoHeader {
+/* ── Stats pills ─────────────────────────────────────────────────────────────── */
+.headerStats {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-self: flex-end;
+}
+
+.statPill {
   display: flex;
   align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.statNum {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+/* ── Toggle de vista ─────────────────────────────────────────────────────────── */
+.vistaToggle {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem;
+  width: fit-content;
+}
+
+.vistaBtn {
+  padding: 0.45rem 1.1rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vistaBtn:hover { background: var(--bg); color: var(--text); }
+
+.vistaBtnActive {
+  background: var(--primary);
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   KANBAN BOARD
+══════════════════════════════════════════════════════════════════════════════ */
+
+.kanbanBoard {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 1rem;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  /* Salir del page-container para usar todo el ancho */
+  margin: 0 -1.5rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
+/* ── Columna ─────────────────────────────────────────────────────────────────── */
+.kanbanCol {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kanbanColDragOver {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.18);
+}
+
+.kanbanColHeader {
+  padding: 1rem;
+  border-top: 3px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kanbanColTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kanbanColEmoji { font-size: 1.1rem; }
+
+.kanbanColTitle strong { font-size: 0.88rem; font-weight: 700; display: block; }
+.kanbanColDesc { font-size: 0.72rem; color: var(--text-muted); display: block; }
+
+.kanbanBadge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ── Zona de tarjetas ────────────────────────────────────────────────────────── */
+.kanbanCards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: 0.6rem;
-  flex-wrap: wrap;
+  padding: 0.75rem;
+  min-height: 200px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  transition: background 0.15s;
+}
+
+.kanbanCardsOver {
+  background: rgba(99,102,241,0.04);
+}
+
+.kanbanEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 1.5px dashed var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  text-align: center;
+  padding: 0.5rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+/* ── Tarjeta Kanban ──────────────────────────────────────────────────────────── */
+.kanbanCard {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.75rem;
+  cursor: grab;
+  position: relative;
+  transition: box-shadow 0.15s, transform 0.1s, border-color 0.15s;
+  user-select: none;
+}
+
+.kanbanCard:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  border-color: var(--primary-light, #a5b4fc);
+  transform: translateY(-1px);
+}
+
+.kanbanCard:active { cursor: grabbing; transform: scale(0.98); }
+
+.kanbanCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.4rem;
 }
 
-/* ── Barra de compatibilidad ─────────────────────────────────────────────── */
-.compatWrap {
+.kanbanAvatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  margin: 0.5rem 0;
+  justify-content: center;
 }
 
-.compatLabel {
-  font-size: 0.78rem;
-  font-weight: 700;
+.kanbanCardName strong { font-size: 0.85rem; font-weight: 700; display: block; }
+.kanbanCardName span   { font-size: 0.72rem; color: var(--text-muted); }
+
+.kanbanCarrera {
+  font-size: 0.75rem;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  white-space: nowrap;
+  background: var(--bg-card);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  margin-bottom: 0.4rem;
+  width: fit-content;
 }
 
-.compatBar {
-  flex: 1;
-  height: 8px;
-  background: var(--border);
-  border-radius: 99px;
-  overflow: hidden;
-  min-width: 80px;
-}
-
-.compatFill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.6s ease;
-}
-
-.compatPct {
-  font-size: 0.82rem;
-  font-weight: 800;
-  min-width: 2.5rem;
-  text-align: right;
-}
-
-/* ── Historial académico ─────────────────────────────────────────────────── */
-.academicBox {
+.kanbanCardFooter {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  background: var(--bg-card2);
-  border-left: 3px solid var(--primary);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  padding: 0.5rem 0.75rem;
-  margin: 0.5rem 0;
-  font-size: 0.88rem;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.kanbanFecha {
+  font-size: 0.7rem;
   color: var(--text-muted);
+  margin-left: auto;
 }
 
-.academicTitle {
-  font-weight: 700;
-  color: var(--secondary);
-  margin-bottom: 0.1rem;
+.kanbanDragHint {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--border);
+  line-height: 1;
 }
 
-/* ── Sin CV ──────────────────────────────────────────────────────────────── */
-.sinCv {
-  display: inline-block;
-  margin-top: 0.5rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  font-style: italic;
-}
+/* ══════════════════════════════════════════════════════════════════════════════
+   VISTA LISTA
+══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Carta de presentación ───────────────────────────────────────────────── */
-.cartaDetails {
-  margin-top: 0.5rem;
-}
-
-.cartaDetails summary {
-  cursor: pointer;
-  color: var(--primary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  list-style: none;
-}
-
-.cartaDetails summary::-webkit-details-marker { display: none; }
-
-.cartaDetails p {
-  margin-top: 0.5rem;
-  background: var(--bg-card2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  color: var(--text);
-  white-space: pre-wrap;
-}
-
-/* ── Etiqueta del selector de estado ─────────────────────────────────────── */
-.estadoLabel {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.35rem;
-}
-
-/* ── Barra de filtro ─────────────────────────────────────────────────────── */
+/* Filtro chips */
 .filtroBar {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
-.filtroSelect {
-  min-width: 160px;
-  padding: 0.45rem 0.85rem;
-  border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  font-size: 0.88rem;
-  background: var(--bg-card);
-  color: var(--text);
+.filtroChips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
-/* ── Estado vacío ────────────────────────────────────────────────────────── */
+.filtroChip {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filtroChip:hover { border-color: var(--primary); }
+.filtroChipActive { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+/* Tarjeta lista */
+.listaCards { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.candidatoCard {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s;
+}
+.candidatoCard:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+.estadoLateral {
+  width: 8px;
+  min-width: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  writing-mode: vertical-rl;
+  padding: 0.5rem 0.25rem;
+}
+
+.candidatoBody { flex: 1; padding: 1rem 1.25rem; min-width: 0; }
+
+.candidatoTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.candidatoAvatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.candidatoInfo { flex: 1; min-width: 160px; }
+.candidatoInfo strong { display: block; font-size: 0.95rem; font-weight: 700; }
+.candidatoInfo span   { display: block; font-size: 0.8rem; color: var(--text-muted); }
+
+.carrera {
+  display: inline-block !important;
+  font-size: 0.75rem !important;
+  color: var(--text-muted) !important;
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.candidatoMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+}
+
+.fechaPost { font-size: 0.75rem; color: var(--text-muted); }
+
+.candidatoExtras {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btnCv {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.btnCv:hover { background: var(--bg-card); }
+
+.sinCv { font-size: 0.78rem; color: var(--text-muted); }
+
+.carta { font-size: 0.82rem; }
+.carta summary { cursor: pointer; font-weight: 600; }
+.carta p { margin: 0.4rem 0 0; color: var(--text-muted); }
+
+/* Selector de estado */
+.selectorEstado {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem;
+  border-left: 1px solid var(--border);
+  justify-content: center;
+  min-width: 150px;
+}
+.selectorEstado label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+.selectorEstado select {
+  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.selectorEstado select:focus { outline: none; border-color: var(--primary); }
+
+/* ── Compat bar ──────────────────────────────────────────────────────────────── */
+.compatWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 80px;
+}
+
+.compatBar {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.compatFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.compatPct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Aval badge ──────────────────────────────────────────────────────────────── */
+.avalBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ── Skeleton de carga ───────────────────────────────────────────────────────── */
+.skeletonKanban {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+}
+
+.skeletonCol {
+  height: 400px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f8 50%, #e8edf2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Estado vacío ────────────────────────────────────────────────────────────── */
 .emptyState {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 3rem 1rem;
+  padding: 4rem 1rem;
   background: var(--bg-card);
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   text-align: center;
   color: var(--text-muted);
 }
-
 .emptyState span { font-size: 2.5rem; }
 
-/* ── Aval Badge (visible para la empresa) ────────────────────────────────── */
-.avalBadge {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.6rem 0.85rem;
+/* ── Toast ───────────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: #1e293b;
+  color: #fff;
   border-radius: var(--radius);
-  background: var(--aval-bg);
-  border: 1px solid var(--aval-border);
-  color: var(--aval-color);
-  font-size: 0.85rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  margin-top: 0.5rem;
-  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  z-index: 9999;
+  animation: slideUp 0.2s ease, fadeOut 0.4s ease 2.6s forwards;
 }
 
-.avalBadge > span:first-child {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  margin-top: 0.05rem;
+.errorMsg { color: #dc2626; font-size: 0.88rem; margin-bottom: 1rem; }
+
+@keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
+
+/* ── Responsive ──────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .kanbanBoard { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
 }
 
-.avalBadge div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.avalBadge strong {
-  font-size: 0.84rem;
-  color: var(--aval-color);
-}
-
-.avalBadge small {
-  font-size: 0.76rem;
-  font-weight: 400;
-  opacity: 0.85;
-}
-
-.avalBadge em {
-  font-size: 0.78rem;
-  font-style: italic;
-  opacity: 0.8;
-  font-weight: 400;
-  border-left: 2px solid currentColor;
-  padding-left: 0.4rem;
-  margin-top: 0.15rem;
+@media (max-width: 640px) {
+  .kanbanBoard { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .candidatoCard { flex-direction: column; }
+  .estadoLateral { width: 100%; height: 6px; writing-mode: unset; padding: 0; }
+  .selectorEstado { border-left: none; border-top: 1px solid var(--border); }
+  .headerStats { display: none; }
 }

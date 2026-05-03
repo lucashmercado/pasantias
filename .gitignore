@@ -1,0 +1,49 @@
+# ── Dependencias ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build / dist ───────────────────────────────────────────────────────────────
+dist/
+build/
+frontend/dist/
+backend/dist/
+
+# ── Variables de entorno (NUNCA subir al repo) ─────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ── Archivos subidos por usuarios ──────────────────────────────────────────────
+backend/uploads/
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Cache y temporales ─────────────────────────────────────────────────────────
+.cache/
+.vite/
+frontend/.vite/
+*.tsbuildinfo
+
+# ── IDEs y editores ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Sistema operativo ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+coverage/

@@ -1,0 +1,25 @@
+{
+  "name": "pasantias",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000p\u0000a\u0000s\u0000a\u0000n\u0000t\u0000i\u0000a\u0000s\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucashmercado/pasantias.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lucashmercado/pasantias/issues"
+  },
+  "homepage": "https://github.com/lucashmercado/pasantias#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

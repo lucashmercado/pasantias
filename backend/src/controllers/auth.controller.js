@@ -18,7 +18,12 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { Usuario, Perfil, Empresa } = require('../models');
+const { Usuario, Perfil, Empresa, EmpresaUsuario, ActivityLog } = require('../models');
+
+// Helper para registrar acciones en el log sin interrumpir el flujo principal
+async function logAction(datos) {
+  try { await ActivityLog.create(datos); } catch (e) { /* Fallo silencioso */ }
+}
 
 /**
  * Genera un token JWT firmado con los datos del usuario.
@@ -63,10 +68,12 @@ const serializeUsuario = (usuario) => ({
  */
 exports.register = async (req, res) => {
   try {
-    const { nombre, apellido, email, password, rol, razonSocial, telefono, ubicacion } = req.body;
+    const { nombre, apellido, email, password, rol, razonSocial, telefono, ubicacion,
+            carrera, legajo, anioEgreso } = req.body;
 
-    // Validación básica del rol permitido en registro público
-    const rolesPermitidos = ['alumno', 'egresado', 'empresa', 'profesor'];
+    // Validación: solo estos roles pueden registrarse públicamente
+    // 'empresa' solo puede crearse a través del flujo de solicitud aprobado por el admin
+    const rolesPermitidos = ['alumno', 'egresado'];
     if (!rolesPermitidos.includes(rol)) {
       return res.status(400).json({ success: false, message: 'Rol no válido para registro.' });
     }
@@ -91,12 +98,27 @@ exports.register = async (req, res) => {
     });
 
     // Crea el registro adicional según el rol del usuario
-    if (['alumno', 'egresado', 'profesor'].includes(rol)) {
-      // Perfil académico/profesional vacío (alumno, egresado y profesor comparten el mismo modelo)
-      await Perfil.create({ usuarioId: nuevoUsuario.id });
+    if (['alumno', 'egresado'].includes(rol)) {
+      // Perfil académico/profesional — opcionalmente con carrera, legajo y año de egreso
+      await Perfil.create({
+        usuarioId:  nuevoUsuario.id,
+        carrera:    carrera    || null,
+        legajo:     legajo     || null,
+        anioEgreso: anioEgreso || null,
+      });
     } else if (rol === 'empresa') {
       // Perfil de empresa en estado pendiente hasta aprobación del admin
-      await Empresa.create({ usuarioId: nuevoUsuario.id, razonSocial: razonSocial || '' });
+      const empresa = await Empresa.create({ usuarioId: nuevoUsuario.id, razonSocial: razonSocial || '' });
+
+      // Registra automáticamente al creador como propietario del equipo.
+      // Este registro es la base del sistema multi-usuario: sin él el propietario
+      // no aparecería en /api/empresas/equipo junto al resto de los miembros.
+      await EmpresaUsuario.create({
+        empresaId: empresa.id,
+        usuarioId: nuevoUsuario.id,
+        rolInterno: 'propietario',
+        activo: true,
+      });
     }
 
     // Genera el token JWT para que el usuario quede logueado inmediatamente tras el registro
@@ -156,6 +178,16 @@ exports.login = async (req, res) => {
     usuario.update({ ultimoAcceso: new Date() }).catch((err) =>
       console.error('⚠️  No se pudo actualizar ultimoAcceso:', err.message)
     );
+
+    // Registra el login en el log de auditoría (no bloquea el login si falla)
+    logAction({
+      usuarioId: usuario.id,
+      accion: 'login',
+      entidad: 'usuario',
+      entidadId: usuario.id,
+      detalle: { rol: usuario.rol, email: usuario.email },
+      ip: req.ip,
+    });
 
     return res.json({
       success: true,

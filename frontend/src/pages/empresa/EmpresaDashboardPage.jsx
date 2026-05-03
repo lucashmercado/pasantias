@@ -106,10 +106,12 @@ export default function EmpresaDashboardPage() {
       <div className="dashboard-header">
         <h1>Panel de Empresa</h1>
         <div className={styles.headerActions}>
-          <Link to="/empresa/equipo"      className="btn-secondary">👥 Mi Equipo</Link>
+          <Link to="/empresa/seguridad"  className="btn-secondary">🔐 Seguridad</Link>
+          <Link to="/empresa/equipo"     className="btn-secondary">👥 Equipo</Link>
           <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
         </div>
       </div>
+
 
       {/* Error global */}
       {error && <p className="error-msg" style={{ marginBottom: '1.5rem' }}>⚠️ {error}</p>}

@@ -27,8 +27,11 @@ export default function NavbarPublic() {
           </div>
         </Link>
 
-        {/* Botón de acceso al sistema (redirige a la página de login) */}
+        {/* Acciones de la navbar pública */}
         <div className={styles.navbarPublicActions}>
+          <Link to="/registro-empresa" className={styles.btnEmpresa}>
+            🏢 Registrarse como empresa
+          </Link>
           <Link to="/login" className={styles.btnLogin}>
             Iniciar Sesión
           </Link>

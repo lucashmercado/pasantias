@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import MessageModal from '../../components/MessageModal/MessageModal';
 import styles from './LoginPage.module.css';
 
 export default function LoginPage() {
@@ -10,7 +9,6 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', remember:false, });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showMessage, setShowMessage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Buscamos si hay un email guardado en localStorage para autocompletar el campo y marcar "Recordarme"
@@ -24,12 +22,6 @@ export default function LoginPage() {
       }));
     }
   }, []);
-
-  //funcion para abrir el modal
-  const handleConstructionMessage = (e) => {
-    e.preventDefault();
-    setShowMessage(true);
-  };
 
   //Nuevo Abril
   const handleBack = () => {
@@ -192,9 +184,8 @@ export default function LoginPage() {
                 </label>
 
                 <Link
-                  to="#"
+                  to="/forgot-password"
                   className={styles.forgotLink}
-                  onClick={handleConstructionMessage}
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
@@ -215,94 +206,13 @@ export default function LoginPage() {
 
             <p className={`${styles.authLink} ${styles.authRegister}`}>
               ¿No tenés cuenta?{' '}
-              <Link
-                to="#"
-                onClick={handleConstructionMessage}
-              >
+              <Link to="/register">
                 Registrarse
               </Link>
             </p>
           </div>
         </main>
       </div>
-
-      {showMessage && (
-        <MessageModal
-          title="Sitio en construcción"
-          message="Esta funcionalidad todavía no está disponible."
-          onClose={() => setShowMessage(false)}
-        />
-      )}
     </>
   );
 }
-
-//  <>
-//       <div className="auth-container">
-//         <div className="auth-card">
-//           {/* <h1 className="auth-title">Sistema de Pasantías</h1> */}
-//           <h2 className="auth-subtitle">Iniciar Sesión</h2>
-//           <form
-//             onSubmit={handleSubmit}
-//             className="auth-form"
-//           >
-//             <div className="form-group">
-//               <label>Email</label>
-//               <input
-//                 type="email"
-//                 name="email"
-//                 value={form.email}
-//                 onChange={handleChange}
-//                 required
-//               />
-//             </div>
-//             <div className="form-group">
-//               <div className="label-row">
-//                 <label>Contraseña</label>
-//                 {/* <Link to="/forgot-password" className="forgot-link">¿Olvidaste tu contraseña?</Link> */}
-//                 <Link
-//                   to="#"
-//                   className="forgot-link"
-//                   onClick={handleConstructionMessage}
-//                 >
-//                   ¿Olvidaste tu contraseña?
-//                 </Link>
-//               </div>
-//               <input
-//                 type="password"
-//                 name="password"
-//                 value={form.password}
-//                 onChange={handleChange}
-//                 required
-//               />
-//             </div>
-//             {error && <p className="error-msg">{error}</p>}
-//             <button
-//               type="submit"
-//               className="btn-primary"
-//               disabled={loading}
-//             >
-//               {loading ? 'Ingresando...' : 'Ingresar'}
-//             </button>
-//           </form>
-//           <p className="auth-link">
-//             {/* ¿No tenés cuenta? <Link to="/register">Registrate</Link> */}
-//             ¿No tenés cuenta?{' '}
-//             <Link
-//               to="#"
-//               onClick={handleConstructionMessage}
-//             >
-//               Registrate
-//             </Link>
-//           </p>
-//         </div>
-//       </div>
-
-//       {showMessage && (
-//         <MessageModal
-//           title="Sitio en construcción"
-//           message="Esta funcionalidad todavía no está disponible."
-//           onClose={() => setShowMessage(false)}
-//         />
-//       )}
-//     </>
