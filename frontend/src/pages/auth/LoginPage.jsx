@@ -6,7 +6,7 @@ import styles from './LoginPage.module.css';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '', remember:false, });
+  const [form, setForm] = useState({ email: '', password: '', remember: false, });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +32,7 @@ export default function LoginPage() {
   //   setForm({ ...form, [e.target.name]: e.target.value });
   //Modificacion Abril
   const handleChange = (e) => {
-    const {name, value, type, checked} = e.target;
+    const { name, value, type, checked } = e.target;
 
     setForm((prev) => ({
       ...prev,
@@ -55,10 +55,10 @@ export default function LoginPage() {
       }
       // ----------------------------
 
-      if (usuario.rol === 'admin')         navigate('/admin');
-      else if (usuario.rol === 'empresa')   navigate('/empresa');
-      else if (usuario.rol === 'profesor')  navigate('/profesor');
-      else                                  navigate('/dashboard'); // alumno / egresado
+      if (usuario.rol === 'admin') navigate('/admin');
+      else if (usuario.rol === 'empresa') navigate('/empresa');
+      else if (usuario.rol === 'profesor') navigate('/profesor');
+      else navigate('/dashboard'); // alumno / egresado
     } catch (err) {
       setError(err.response?.data?.message || 'Error al iniciar sesión.');
     } finally {
@@ -67,7 +67,7 @@ export default function LoginPage() {
   };
 
   return (
-   <>
+    <>
       <div className={styles.authLayout}>
         {/* Top bar desktop */}
         <header className={styles.authTopbar}>
@@ -80,7 +80,7 @@ export default function LoginPage() {
             <span>volver</span>
           </button>
 
-          <img 
+          <img
             src="/logo1-itb.png"
             alt="Instituto Tecnológico Beltrán"
             className={styles.authTopLogo}
@@ -90,11 +90,11 @@ export default function LoginPage() {
         <main className={`${styles.authContainer} ${styles.authContainer}`}>
           <div className={`${styles.authCard} ${styles.authCardWireframe}`}>
             {/* Logo mobile */}
-           <img
+            <img
               src="/logo1-itb.png"
               alt="Instituto Tecnológico Beltrán"
               className={styles.authLogoMobile}
-          />
+            />
 
             <div className={styles.authHeader}>
               <h1 className={styles.authSubtitle}>Inicia Sesión</h1>
@@ -206,7 +206,7 @@ export default function LoginPage() {
 
             <p className={`${styles.authLink} ${styles.authRegister}`}>
               ¿No tenés cuenta?{' '}
-              <Link to="/register">
+              <Link to="/registro-empresa">
                 Registrarse
               </Link>
             </p>

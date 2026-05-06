@@ -14,14 +14,14 @@ import { adminService } from '../../services/api';
 import styles from './AdminUsuariosPage.module.css';
 
 /* Roles disponibles en el sistema */
-const ROLES = ['alumno', 'egresado', 'empresa', 'profesor', 'admin'];
+const ROLES = ['alumno', 'egresado', 'empresa', 'admin'];
 
 /* Etiquetas y colores para cada rol */
 const ROL_BADGE = {
   alumno:   { label: 'Alumno',   color: '#0073AD' },
   egresado: { label: 'Egresado', color: '#8e44ad' },
   empresa:  { label: 'Empresa',  color: '#e67e22' },
-  profesor: { label: 'Profesor', color: '#27ae60' },
+
   admin:    { label: 'Admin',    color: '#c0392b' },
 };
 
