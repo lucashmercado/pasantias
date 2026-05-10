@@ -33,6 +33,19 @@ function textToCert(text) {
   return text.split('\n').map(s => s.trim()).filter(Boolean);
 }
 
+// Convierte array a string separado por coma para inputs de tags
+function arrayToTagText(val) {
+  if (!val) return '';
+  if (Array.isArray(val)) return val.join(', ');
+  return String(val);
+}
+
+// Convierte string separado por coma a array (para habilidades/idiomas)
+function tagTextToArray(text) {
+  if (!text || !text.trim()) return [];
+  return text.split(',').map(s => s.trim()).filter(Boolean);
+}
+
 /**
  * Calcula el % de completitud usando los MISMOS 15 campos que el backend
  * (_calcularCompletitudPerfil en student.controller.js), para que el número
@@ -57,8 +70,7 @@ function calcularCompletitud(form, perfil) {
     !!form.experienciaLaboral,
     // certificaciones: puede venir como texto con saltos de línea
     !!(form.certificaciones && form.certificaciones.trim()),
-    // telefono y ubicacion viven en el modelo Usuario, no en Perfil
-    // → no los tenemos en el form, así que los leemos del perfil cargado
+    // telefono y ubicacion: ahora los devuelve el backend junto con el perfil
     !!(perfil?.telefono),
     !!(perfil?.ubicacion),
   ];
@@ -110,6 +122,12 @@ export default function PerfilPage() {
     visibilidadPerfil:       'publica',
     redesSociales:           '',
     fotoPerfil:              '',
+    // Campos del modelo Usuario (se guardan separados en el backend)
+    telefono:                '',
+    ubicacion:               '',
+    // Habilidades e idiomas (arrays, se muestran como tags separados por coma)
+    habilidadesTexto:        '',   // texto editable, se convierte a array al guardar
+    idiomasTexto:            '',   // texto editable, se convierte a array al guardar
   });
 
   useEffect(() => {
@@ -124,6 +142,14 @@ export default function PerfilPage() {
           certificaciones: certToText(d.certificaciones),
           // visibilidadPerfil: el backend devuelve boolean, el select usa string
           visibilidadPerfil: d.visibilidadPerfil === false ? 'privada' : 'publica',
+          // redesSociales: el backend guarda { texto: "..." } en JSONB; extraer el texto
+          redesSociales: d.redesSociales?.texto || (typeof d.redesSociales === 'string' ? d.redesSociales : '') || '',
+          // Habilidades e idiomas: arrays → texto separado por coma
+          habilidadesTexto: arrayToTagText(d.habilidades),
+          idiomasTexto: arrayToTagText(d.idiomas),
+          // telefono y ubicacion vienen del modelo Usuario (incluidos en el GET enriquecido)
+          telefono: d.telefono || '',
+          ubicacion: d.ubicacion || '',
         }));
         // Inicializar preview de foto
         if (d.fotoPerfil) setFotoPreview(d.fotoPerfil);
@@ -144,10 +170,17 @@ export default function PerfilPage() {
     setGuardando(true);
     try {
       // Preparar datos: certificaciones como array para el backend
+      // habilidadesTexto/idiomasTexto (texto) → arrays para el backend
       const payload = {
         ...form,
         certificaciones: textToCert(form.certificaciones),
+        habilidades: tagTextToArray(form.habilidadesTexto),
+        idiomas: tagTextToArray(form.idiomasTexto),
       };
+      // Limpiar campos auxiliares de texto que no van al backend
+      delete payload.habilidadesTexto;
+      delete payload.idiomasTexto;
+
       const { data } = await userService.updatePerfil(payload);
       const perfilActualizado = data.data;
       setPerfil(perfilActualizado);
@@ -251,6 +284,18 @@ export default function PerfilPage() {
             <input name="areaInteres" value={form.areaInteres || ''} onChange={handleChange}
               placeholder="Ej: Desarrollo Web, Data Science, Redes..." />
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Teléfono de contacto</label>
+              <input name="telefono" value={form.telefono || ''} onChange={handleChange}
+                placeholder="Ej: +54 9 11 1234-5678" />
+            </div>
+            <div className="form-group">
+              <label>Ubicación (ciudad / provincia)</label>
+              <input name="ubicacion" value={form.ubicacion || ''} onChange={handleChange}
+                placeholder="Ej: Buenos Aires, Argentina" />
+            </div>
+          </div>
         </FormSection>
 
         {/* ── 2. Redes sociales y portfolio ───────────────────────────────── */}
@@ -286,14 +331,16 @@ export default function PerfilPage() {
             {fotoPreview && (
               <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <img
+                  key={fotoPreview}
                   src={fotoPreview}
                   alt="Preview foto de perfil"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                  onLoad={(e) => { e.target.style.display = 'block'; }}
+                  onError={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.pointerEvents = 'none'; }}
+                  onLoad={(e) => { e.currentTarget.style.opacity = '1'; }}
                   style={{
                     width: 72, height: 72, borderRadius: '50%',
                     objectFit: 'cover', border: '2px solid var(--border)',
-                    display: 'none',
+                    opacity: 0,
+                    transition: 'opacity 0.3s ease',
                   }}
                 />
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Vista previa</span>
@@ -304,6 +351,57 @@ export default function PerfilPage() {
 
         {/* ── 3. Experiencia y proyectos ──────────────────────────────────── */}
         <FormSection title="Experiencia y Proyectos" icon="💼">
+          <div className="form-row">
+            <div className="form-group">
+              <label>
+                Habilidades Técnicas
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                  (separá con comas, ej: JavaScript, React, SQL)
+                </span>
+              </label>
+              <input
+                name="habilidadesTexto"
+                value={form.habilidadesTexto || ''}
+                onChange={handleChange}
+                placeholder="JavaScript, React, Node.js, SQL..."
+              />
+              {/* Tags visuales de las habilidades ya cargadas */}
+              {form.habilidadesTexto && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                  {tagTextToArray(form.habilidadesTexto).map((h, i) => (
+                    <span key={i} style={{
+                      background: 'var(--primary-light, #e0f2fe)', color: 'var(--primary, #0284c7)',
+                      borderRadius: '999px', padding: '0.15rem 0.65rem', fontSize: '0.78rem', fontWeight: 600,
+                    }}>{h}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="form-group">
+              <label>
+                Idiomas
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                  (separá con comas, ej: Español, Inglés B2)
+                </span>
+              </label>
+              <input
+                name="idiomasTexto"
+                value={form.idiomasTexto || ''}
+                onChange={handleChange}
+                placeholder="Español nativo, Inglés B2, Portugués..."
+              />
+              {form.idiomasTexto && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                  {tagTextToArray(form.idiomasTexto).map((idioma, i) => (
+                    <span key={i} style={{
+                      background: 'var(--success-light, #dcfce7)', color: 'var(--success, #16a34a)',
+                      borderRadius: '999px', padding: '0.15rem 0.65rem', fontSize: '0.78rem', fontWeight: 600,
+                    }}>{idioma}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="form-group">
             <label>Experiencia Laboral</label>
             <textarea name="experienciaLaboral" value={form.experienciaLaboral || ''}

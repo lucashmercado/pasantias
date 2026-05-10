@@ -21,9 +21,33 @@ const ROL_BADGE = {
   alumno:   { label: 'Alumno',   color: '#0073AD' },
   egresado: { label: 'Egresado', color: '#8e44ad' },
   empresa:  { label: 'Empresa',  color: '#e67e22' },
-
+  profesor: { label: 'Profesor', color: '#16a085' },
   admin:    { label: 'Admin',    color: '#c0392b' },
 };
+
+/* Etiquetas para rolInterno dentro de empresa_usuarios */
+const ROL_INTERNO_LABEL = {
+  propietario: 'Propietario',
+  gerente:     'Gerente',
+  reclutador:  'Reclutador',
+  viewer:      'Viewer',
+};
+
+/**
+ * Devuelve { label, sub, color } para el badge de rol.
+ * Para usuarios 'empresa' muestra el rolInterno (Propietario/Reclutador/etc.)
+ * y el nombre de la empresa como subtexto.
+ */
+function getRolInfo(u) {
+  if (u.rol === 'empresa' && u.membresiasEmpresa?.length > 0) {
+    const mem      = u.membresiasEmpresa[0];
+    const rolLabel = ROL_INTERNO_LABEL[mem.rolInterno] ?? mem.rolInterno;
+    const empresa  = mem.empresa?.razonSocial ?? '';
+    return { label: rolLabel, sub: empresa, color: '#e67e22' };
+  }
+  const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: '#666' };
+  return { label: badge.label, sub: '', color: badge.color };
+}
 
 /* Estado inicial del formulario (crear/editar) */
 const FORM_VACIO = {
@@ -125,20 +149,23 @@ export default function AdminUsuariosPage() {
     }
   };
 
-  /* ── Eliminar usuario ─────────────────────────────────────────────── */
-  const handleEliminar = async () => {
+  /* ── Suspender / Reactivar cuenta (desde el modal de confirmación) ── */
+  const handleSuspender = async () => {
     try {
-      await adminService.eliminarUsuario(eliminando.id);
-      showSuccess('Usuario desactivado.');
+      await adminService.toggleUsuario(eliminando.id);
+      const nuevoEstado = !eliminando.activo;
+      setUsuarios((prev) => prev.map((u) =>
+        u.id === eliminando.id ? { ...u, activo: nuevoEstado } : u
+      ));
+      showSuccess(nuevoEstado ? 'Cuenta reactivada.' : 'Cuenta suspendida.');
       cerrarModal();
-      cargar();
-    } catch (err) {
-      setError(err.response?.data?.message ?? 'Error al eliminar el usuario.');
+    } catch {
+      setError('Error al cambiar el estado de la cuenta.');
       cerrarModal();
     }
   };
 
-  /* ── Toggle activo ────────────────────────────────────────────────── */
+  /* ── Toggle activo (botón rápido en columna Estado) ──────────────── */
   const handleToggle = async (id) => {
     try {
       await adminService.toggleUsuario(id);
@@ -217,7 +244,7 @@ export default function AdminUsuariosPage() {
             </thead>
             <tbody>
               {usuarios.map((u) => {
-                const badge = ROL_BADGE[u.rol] ?? { label: u.rol, color: '#666' };
+                const rolInfo = getRolInfo(u);
                 return (
                   <tr key={u.id} className={u.activo ? '' : styles.rowInactiva}>
                     <td className={styles.idCell}>#{u.id}</td>
@@ -232,9 +259,16 @@ export default function AdminUsuariosPage() {
                     </td>
                     <td className={styles.emailCell}>{u.email}</td>
                     <td>
-                      <span className={styles.rolBadge} style={{ '--badge-color': badge.color }}>
-                        {badge.label}
-                      </span>
+                      <div>
+                        <span className={styles.rolBadge} style={{ '--badge-color': rolInfo.color }}>
+                          {rolInfo.label}
+                        </span>
+                        {rolInfo.sub && (
+                          <small className={styles.ubicacion} style={{ display: 'block', marginTop: '3px' }}>
+                            🏢 {rolInfo.sub}
+                          </small>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <button
@@ -253,7 +287,13 @@ export default function AdminUsuariosPage() {
                     <td>
                       <div className={styles.accionesBtns}>
                         <button className="btn-small" onClick={() => abrirEditar(u)} title="Editar usuario">✏️ Editar</button>
-                        <button className="btn-danger btn-small" onClick={() => abrirConfirmar(u)} title="Eliminar usuario">🗑️</button>
+                        <button
+                          className={`btn-small ${u.activo ? 'btn-danger' : 'btn-ok'}`}
+                          onClick={() => abrirConfirmar(u)}
+                          title={u.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}
+                        >
+                          {u.activo ? '🔒 Suspender' : '🔓 Reactivar'}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -333,19 +373,33 @@ export default function AdminUsuariosPage() {
         </div>
       )}
 
-      {/* ── Modal Confirmar Eliminar ─────────────────────────────────── */}
+      {/* ── Modal Confirmar Suspender / Reactivar ────────────────────── */}
       {modal === 'confirmar' && eliminando && (
         <div className={styles.modalOverlay} onClick={cerrarModal}>
           <div className={styles.modalConfirm} onClick={(e) => e.stopPropagation()}>
-            <span className={styles.confirmIcon}>⚠️</span>
-            <h2>¿Eliminar usuario?</h2>
+            <span className={styles.confirmIcon}>{eliminando.activo ? '🔒' : '🔓'}</span>
+            <h2>{eliminando.activo ? 'Suspender cuenta' : 'Reactivar cuenta'}</h2>
             <p>
-              Se desactivará la cuenta de <strong>{eliminando.nombre} {eliminando.apellido}</strong> ({eliminando.email}).
-              Los datos históricos se conservan.
+              {eliminando.activo ? (
+                <>
+                  La cuenta de <strong>{eliminando.nombre} {eliminando.apellido}</strong> ({eliminando.email}) quedará{' '}
+                  <strong>inactiva</strong>. El usuario no podrá iniciar sesión. Los datos se conservan.
+                </>
+              ) : (
+                <>
+                  La cuenta de <strong>{eliminando.nombre} {eliminando.apellido}</strong> ({eliminando.email}) quedará{' '}
+                  <strong>activa</strong> nuevamente y podrá iniciar sesión.
+                </>
+              )}
             </p>
             <div className={styles.modalFooter}>
               <button className="btn-secondary" onClick={cerrarModal}>Cancelar</button>
-              <button className="btn-danger" onClick={handleEliminar}>Sí, desactivar</button>
+              <button
+                className={eliminando.activo ? 'btn-danger' : 'btn-ok'}
+                onClick={handleSuspender}
+              >
+                {eliminando.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
+              </button>
             </div>
           </div>
         </div>

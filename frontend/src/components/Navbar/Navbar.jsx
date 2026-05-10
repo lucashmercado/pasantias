@@ -18,13 +18,13 @@ import styles from './Navbar.module.css';
 
 export default function Navbar() {
   const { usuario, logout } = useAuth();
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [noLeidas,       setNoLeidas]       = useState(0);
-  const [prioridadAlta,  setPrioridadAlta]  = useState(false);
-  const [mensajesNL,     setMensajesNL]     = useState(0);
-  const [menuOpen,       setMenuOpen]       = useState(false);
+  const [noLeidas, setNoLeidas] = useState(0);
+  const [prioridadAlta, setPrioridadAlta] = useState(false);
+  const [mensajesNL, setMensajesNL] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   /* ── Recargar contadores al cambiar de ruta ──────────────────────────── */
@@ -39,7 +39,7 @@ export default function Navbar() {
         setNoLeidas(sinLeer.length);
         setPrioridadAlta(sinLeer.some((n) => n.prioridad === 'alta' || n.tipoVisual === 'urgente'));
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Mensajes no leídos
     mensajeService.getConversaciones()
@@ -48,7 +48,7 @@ export default function Navbar() {
         const total = lista.reduce((acc, c) => acc + (c.mensajesNoLeidos ?? 0), 0);
         setMensajesNL(total);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [usuario, location.pathname]);
 
   /* ── Cerrar menú al hacer click fuera ────────────────────────────────── */
@@ -70,38 +70,38 @@ export default function Navbar() {
 
   /* ── Links según rol ─────────────────────────────────────────────────── */
   const linksAlumnoEgresado = [
-    { to: '/dashboard',         label: 'Dashboard' },
-    { to: '/ofertas',           label: 'Ofertas' },
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/ofertas', label: 'Ofertas' },
     { to: '/mis-postulaciones', label: 'Mis Postulaciones' },
-    { to: '/perfil',            label: 'Mi Perfil' },
+    { to: '/perfil', label: 'Mi Perfil' },
   ];
 
   const linksEmpresa = [
-    { to: '/empresa',              label: 'Panel' },
+    { to: '/empresa', label: 'Panel' },
     { to: '/empresa/nueva-oferta', label: '+ Nueva Oferta' },
-    { to: '/empresa/equipo',       label: 'Equipo' },
+    { to: '/empresa/equipo', label: 'Equipo' },
   ];
 
   const linksProfesor = [
-    { to: '/profesor',        label: 'Panel Profesor' },
+    { to: '/profesor', label: 'Panel Profesor' },
     { to: '/profesor/avales', label: 'Avales' },
   ];
 
   const linksAdmin = [
-    { to: '/admin',             label: 'Dashboard' },
+    { to: '/admin', label: 'Dashboard' },
     { to: '/admin/solicitudes', label: '📋 Solicitudes' },
-    { to: '/admin/usuarios',    label: '👥 Usuarios' },
-    { to: '/admin/logs',        label: 'Logs' },
+    { to: '/admin/usuarios', label: '👥 Usuarios' },
+    { to: '/admin/logs', label: 'Historial de Accesos' },
   ];
 
   const getLinks = () => {
     switch (usuario.rol) {
-      case 'admin':    return linksAdmin;
-      case 'empresa':  return linksEmpresa;
+      case 'admin': return linksAdmin;
+      case 'empresa': return linksEmpresa;
       case 'profesor': return linksProfesor;
       case 'alumno':
       case 'egresado':
-      default:         return linksAlumnoEgresado;
+      default: return linksAlumnoEgresado;
     }
   };
 

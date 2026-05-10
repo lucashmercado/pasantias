@@ -457,6 +457,32 @@ export default function AdminSolicitudesPage() {
               ) : null;
             })()}
 
+            {/* Reclutadores incluidos en la solicitud */}
+            {(() => {
+              const recls = Array.isArray(detalle.reclutadores)
+                ? detalle.reclutadores.filter(r => r?.nombre && r?.email)
+                : [];
+              return recls.length > 0 ? (
+                <div className={styles.detalleSection}>
+                  <h4 className={styles.detalleSectionTitle}>
+                    👥 Reclutadores solicitados ({recls.length})
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    Al aprobar esta solicitud se crearán como solicitudes de reclutador pendientes.
+                  </p>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {recls.map((r, i) => (
+                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', background: '#f0f6fc', borderRadius: '6px', padding: '6px 10px' }}>
+                        <span style={{ fontWeight: 600 }}>{r.nombre}</span>
+                        <span style={{ color: '#64748b' }}>·</span>
+                        <a href={`mailto:${r.email}`} style={{ color: '#0073AD' }}>{r.email}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })()}
+
             {/* Botones de acción en el panel */}
             {detalle.estado === 'pendiente' && (
               <div className={styles.detalleActions}>

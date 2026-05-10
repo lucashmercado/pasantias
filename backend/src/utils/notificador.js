@@ -1,0 +1,63 @@
+/**
+ * notificador.js — Wrapper que crea una notificación en BD Y envía email.
+ *
+ * Reemplaza los `await Notificacion.create(...)` dispersos en los controladores.
+ * Nunca interrumpe el flujo principal: si el email falla, la notificación
+ * en BD ya quedó creada igual.
+ *
+ * Uso:
+ *   const { crearNotificacion } = require('../utils/notificador');
+ *
+ *   await crearNotificacion({
+ *     usuarioId: 5,
+ *     titulo: 'Nueva postulación',
+ *     mensaje: 'Juan se postuló a tu oferta.',
+ *     tipo: 'postulacion',
+ *     enlace: '/empresa/postulaciones/3',
+ *   });
+ */
+
+'use strict';
+
+const { Notificacion, Usuario } = require('../models');
+const { enviarEmail, htmlNotificacion } = require('./mailer');
+
+/**
+ * Crea una notificación en la base de datos y envía un email al destinatario.
+ *
+ * @param {object} datos - Campos de Notificacion (usuarioId, titulo, mensaje, tipo, enlace, ...)
+ */
+async function crearNotificacion(datos) {
+  // 1. Crear la notificación en BD (siempre, independiente del email)
+  const notif = await Notificacion.create(datos);
+
+  // 2. Enviar email de forma asíncrona (fire-and-forget — no bloquea la respuesta)
+  _enviarEmailNotificacion(datos).catch((err) =>
+    console.error('[Notificador] Error enviando email:', err.message)
+  );
+
+  return notif;
+}
+
+/**
+ * Busca el email del usuario y envía el correo de notificación.
+ * @private
+ */
+async function _enviarEmailNotificacion({ usuarioId, titulo, mensaje, enlace }) {
+  try {
+    const usuario = await Usuario.findByPk(usuarioId, {
+      attributes: ['email', 'nombre'],
+    });
+    if (!usuario?.email) return;
+
+    await enviarEmail({
+      to: usuario.email,
+      subject: `🔔 ${titulo} — SisPasantías`,
+      html: htmlNotificacion({ titulo, mensaje, enlace }),
+    });
+  } catch (err) {
+    console.error('[Notificador] No se pudo enviar el email de notificación:', err.message);
+  }
+}
+
+module.exports = { crearNotificacion };

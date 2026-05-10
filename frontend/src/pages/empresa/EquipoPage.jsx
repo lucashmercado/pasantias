@@ -240,7 +240,7 @@ function ModalEditarRol({ miembro, onClose, onGuardado }) {
 }
 
 /* ── Tarjeta de miembro ─────────────────────────────────────────────────────── */
-function MiembroCard({ miembro, esPropietario, onEditarRol, onCambiarPwd, onToggleActivo, onEliminar }) {
+function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
   const u = miembro.usuario ?? miembro;
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const inicial = nombre[0]?.toUpperCase() ?? '?';
@@ -262,10 +262,12 @@ function MiembroCard({ miembro, esPropietario, onEditarRol, onCambiarPwd, onTogg
       </div>
       {esPropietario && !esProp && (
         <div className={styles.cardAcciones}>
-          <button className={`${styles.btnAccion} ${miembro.activo ? styles.btnWarning : styles.btnOk}`} onClick={() => onToggleActivo(miembro)}>
+          <button
+            className={`${styles.btnAccion} ${miembro.activo ? styles.btnWarning : styles.btnOk}`}
+            onClick={() => onToggleActivo(miembro)}
+          >
             {miembro.activo ? '⏸ Suspender' : '▶ Reactivar'}
           </button>
-          <button className={`${styles.btnAccion} ${styles.btnDanger}`} onClick={() => onEliminar(miembro)}>🗑 Quitar</button>
         </div>
       )}
     </div>
@@ -300,9 +302,10 @@ export default function EquipoPage() {
   const [toast,       setToast]       = useState('');
   const [rolEnEquipo, setRolEnEquipo] = useState(null);
 
-  const [modalSolicitar, setModalSolicitar] = useState(false);
-  const [modalRol,       setModalRol]       = useState(null);
-  const [modalPwd,       setModalPwd]       = useState(null);
+  const [modalSolicitar,  setModalSolicitar]  = useState(false);
+  const [modalRol,        setModalRol]        = useState(null);
+  const [modalPwd,        setModalPwd]        = useState(null);
+  const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
 
   const esPropietario = rolEnEquipo === 'propietario';
   const activos    = equipo.filter(m => m.activo !== false);
@@ -344,9 +347,15 @@ export default function EquipoPage() {
   };
 
   const handleToggleActivo = async (miembro) => {
+    // Abre el modal visual en lugar de window.confirm
+    setModalSuspender(miembro);
+  };
+
+  const confirmarToggle = async () => {
+    const miembro = modalSuspender;
+    if (!miembro) return;
     const nuevoEstado = !miembro.activo;
-    const accion = nuevoEstado ? 'reactivar' : 'suspender';
-    if (!window.confirm(`¿Querés ${accion} la cuenta de ${miembro.usuario?.nombre ?? miembro.nombre}?`)) return;
+    setModalSuspender(null);
     try {
       await empresaService.editarMiembro(miembro.id, { activo: nuevoEstado });
       setEquipo(prev => prev.map(m => m.id === miembro.id ? { ...m, activo: nuevoEstado } : m));
@@ -439,10 +448,7 @@ export default function EquipoPage() {
           <div className={styles.listaCards}>
             {activos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
-                onEditarRol={() => setModalRol(m)}
-                onCambiarPwd={() => setModalPwd(m)}
                 onToggleActivo={handleToggleActivo}
-                onEliminar={handleEliminar}
               />
             ))}
           </div>
@@ -456,10 +462,7 @@ export default function EquipoPage() {
           <div className={styles.listaCards}>
             {suspendidos.map(m => (
               <MiembroCard key={m.id} miembro={m} esPropietario={esPropietario}
-                onEditarRol={() => setModalRol(m)}
-                onCambiarPwd={() => setModalPwd(m)}
                 onToggleActivo={handleToggleActivo}
-                onEliminar={handleEliminar}
               />
             ))}
           </div>
@@ -521,6 +524,67 @@ export default function EquipoPage() {
           onClose={() => setModalPwd(null)}
           onGuardado={handlePwdGuardada}
         />
+      )}
+
+      {/* Modal confirmar suspender / reactivar */}
+      {modalSuspender && (
+        <div className={styles.overlay} onClick={() => setModalSuspender(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className={styles.modalHeader}>
+              <h3>{modalSuspender.activo ? '🔒 Suspender cuenta' : '🔓 Reactivar cuenta'}</h3>
+              <button className={styles.modalClose} onClick={() => setModalSuspender(null)}>✕</button>
+            </div>
+
+            {/* Avatar + nombre centrado */}
+            <div style={{ textAlign: 'center', padding: '1.5rem 1.5rem 0' }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%', margin: '0 auto 0.75rem',
+                background: modalSuspender.activo ? '#fee2e2' : '#dcfce7',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.8rem',
+              }}>
+                {modalSuspender.activo ? '🔒' : '🔓'}
+              </div>
+              <p style={{ fontWeight: 600, fontSize: '1rem', marginBottom: '0.25rem' }}>
+                {(modalSuspender.usuario?.nombre ?? modalSuspender.nombre ?? '')} {modalSuspender.usuario?.apellido ?? ''}
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                {modalSuspender.usuario?.email ?? modalSuspender.email}
+              </p>
+            </div>
+
+            {/* Mensaje contextual */}
+            <div style={{
+              margin: '0 1.5rem 1.5rem',
+              padding: '0.9rem 1rem',
+              borderRadius: '8px',
+              background: modalSuspender.activo ? '#fff7ed' : '#f0fdf4',
+              border: `1px solid ${modalSuspender.activo ? '#fed7aa' : '#bbf7d0'}`,
+              fontSize: '0.88rem',
+              color: modalSuspender.activo ? '#92400e' : '#166534',
+            }}>
+              {modalSuspender.activo
+                ? '⚠️ Al suspender, el usuario no podrá iniciar sesión hasta que se reactive. Sus datos y acciones previas se conservan.'
+                : '✅ Al reactivar, el usuario recuperará el acceso al sistema con su rol actual.'
+              }
+            </div>
+
+            <div className={styles.modalActions}>
+              <button className={styles.btnSecondary} onClick={() => setModalSuspender(null)}>Cancelar</button>
+              <button
+                onClick={confirmarToggle}
+                style={{
+                  background: modalSuspender.activo ? '#dc2626' : '#16a34a',
+                  color: '#fff', border: 'none', borderRadius: '8px',
+                  padding: '0.6rem 1.4rem', fontWeight: 600, cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                {modalSuspender.activo ? '🔒 Sí, suspender' : '🔓 Sí, reactivar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -197,9 +197,23 @@ router.get('/usuarios', ...soloAdmin, async (req, res) => {
       where,
       attributes: { exclude: ['password', 'tokenReset', 'tokenResetExpira'] },
       order: [['createdAt', 'DESC']],
+      // Para usuarios con rol 'empresa' incluimos su membresía y empresa
+      include: [{
+        model: EmpresaUsuario,
+        as: 'membresiasEmpresa',
+        required: false,
+        where: { activo: true },
+        attributes: ['rolInterno'],
+        include: [{
+          model: Empresa,
+          as: 'empresa',
+          attributes: ['id', 'razonSocial'],
+        }],
+      }],
     });
     return res.json({ success: true, total: usuarios.length, data: usuarios });
   } catch (err) {
+    console.error('Error en GET /admin/usuarios:', err);
     return res.status(500).json({ success: false, message: 'Error al listar usuarios.' });
   }
 });
@@ -621,6 +635,26 @@ router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, async (req, res) 
       rolInterno: 'propietario',
       activo:     true,
     }, { transaction: t });
+
+    // ── 5b. Crear solicitudes de reclutador para los reclutadores incluidos ───
+    // Si la empresa envió reclutadores en el formulario de registro,
+    // los convertimos en SolicitudReclutador pendientes para que el admin
+    // los apruebe/rechace individualmente en la sección de reclutadores.
+    const reclutadoresSolicitud = Array.isArray(solicitud.reclutadores)
+      ? solicitud.reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim())
+      : [];
+
+    if (reclutadoresSolicitud.length > 0) {
+      await SolicitudReclutador.bulkCreate(
+        reclutadoresSolicitud.map(r => ({
+          empresaId: nuevaEmpresa.id,
+          nombre:    r.nombre.trim(),
+          email:     r.email.trim().toLowerCase(),
+          estado:    'pendiente',
+        })),
+        { transaction: t }
+      );
+    }
 
     // ── 6. Actualizar estado de la solicitud ──────────────────────────────────
     await solicitud.update({ estado: 'aprobado' }, { transaction: t });

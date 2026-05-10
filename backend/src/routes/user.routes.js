@@ -54,9 +54,22 @@ const uploadCarta = multer({
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 
 // GET /api/users/perfil — Obtiene el perfil del usuario autenticado
+// Incluye telefono y ubicacion del modelo Usuario para calcular completitud
 router.get('/perfil', verifyToken, async (req, res) => {
-  const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
-  return res.json({ success: true, data: perfil });
+  try {
+    const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
+    const usuario = await Usuario.findByPk(req.usuario.id, {
+      attributes: ['telefono', 'ubicacion'],
+    });
+    // Combinar datos de perfil con telefono/ubicacion del usuario
+    const datos = perfil ? perfil.toJSON() : {};
+    datos.telefono = usuario?.telefono || null;
+    datos.ubicacion = usuario?.ubicacion || null;
+    return res.json({ success: true, data: datos });
+  } catch (err) {
+    console.error('[GET /perfil] Error:', err.message);
+    return res.status(500).json({ success: false, message: 'Error al obtener el perfil.' });
+  }
 });
 
 // PUT /api/users/perfil — Actualiza el perfil del usuario autenticado
@@ -84,17 +97,16 @@ router.put('/perfil', verifyToken, authorizeRoles('alumno', 'egresado'), async (
       }
     });
 
-    // ── Sanitizar campo JSONB ─────────────────────────────────────────────────
+    // ── Sanitizar campo redesSociales (texto libre, almacenado como JSONB en la BD) ──────────
+    // Se recibe como string de texto plano desde el frontend.
+    // Para evitar errores de casting, lo guardamos envuelto en un objeto JSON simple.
     if (body.redesSociales !== undefined) {
       if (typeof body.redesSociales === 'string') {
         if (!body.redesSociales.trim()) {
           body.redesSociales = null;
         } else {
-          try {
-            body.redesSociales = JSON.parse(body.redesSociales);
-          } catch {
-            body.redesSociales = null;
-          }
+          // Guardar como objeto JSON con clave "texto" para respetar el tipo JSONB
+          body.redesSociales = { texto: body.redesSociales.trim() };
         }
       }
     }
@@ -106,7 +118,16 @@ router.put('/perfil', verifyToken, authorizeRoles('alumno', 'egresado'), async (
       }
     }
 
-    // ── Eliminar campos que no pertenecen al modelo para evitar errores ───────
+    // ── Extraer y guardar telefono/ubicacion en el modelo Usuario ─────────────
+    // Estos campos no pertenecen al Perfil sino al Usuario
+    const datosUsuario = {};
+    if (body.telefono !== undefined) datosUsuario.telefono = body.telefono?.trim() || null;
+    if (body.ubicacion !== undefined) datosUsuario.ubicacion = body.ubicacion?.trim() || null;
+    if (Object.keys(datosUsuario).length > 0) {
+      await Usuario.update(datosUsuario, { where: { id: req.usuario.id } });
+    }
+
+    // ── Eliminar campos que no pertenecen al modelo Perfil para evitar errores ─
     const camposPermitidos = [
       'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
       'certificaciones', 'linkedin', 'github', 'portfolio', 'redesSociales',
@@ -118,8 +139,17 @@ router.put('/perfil', verifyToken, authorizeRoles('alumno', 'egresado'), async (
     );
 
     await Perfil.update(datosLimpios, { where: { usuarioId: req.usuario.id } });
+
+    // Devolver el perfil actualizado junto con telefono/ubicacion del Usuario
     const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
-    return res.json({ success: true, data: perfil });
+    const usuarioActualizado = await Usuario.findByPk(req.usuario.id, {
+      attributes: ['telefono', 'ubicacion'],
+    });
+    const datos = perfil ? perfil.toJSON() : {};
+    datos.telefono = usuarioActualizado?.telefono || null;
+    datos.ubicacion = usuarioActualizado?.ubicacion || null;
+
+    return res.json({ success: true, data: datos });
   } catch (err) {
     console.error('[PUT /perfil] Error:', err.message);
     return res.status(500).json({ success: false, message: 'Error al actualizar el perfil.' });

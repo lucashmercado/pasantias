@@ -59,21 +59,23 @@ function ActividadFeed({ actividad }) {
 }
 
 export default function AdminDashboardPage() {
-  const [stats,             setStats]            = useState(null);
-  const [actividad,         setActividad]         = useState([]);
-  const [empresasPendientes, setEmpresasPendientes] = useState([]);
-  const [ofertasPendientes,  setOfertasPendientes]  = useState([]);
-  const [loading,           setLoading]          = useState(true);
-  const [error,             setError]            = useState('');
+  const [stats,                setStats]               = useState(null);
+  const [actividad,            setActividad]            = useState([]);
+  const [empresasPendientes,   setEmpresasPendientes]   = useState([]);
+  const [reclutadoresPendientes, setReclutadoresPendientes] = useState([]);
+  const [ofertasPendientes,    setOfertasPendientes]    = useState([]);
+  const [loading,              setLoading]              = useState(true);
+  const [error,                setError]                = useState('');
 
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      // Dashboard general + actividad reciente + moderación en paralelo
-      const [dashRes, actRes, epRes, opRes] = await Promise.allSettled([
+      // Dashboard general + actividad + solicitudes empresa + solicitudes reclutador + ofertas en paralelo
+      const [dashRes, actRes, epRes, rrRes, opRes] = await Promise.allSettled([
         adminService.getDashboardGeneral(),
         adminService.getActividadReciente(),
-        adminService.getEmpresasPendientes(),
+        adminService.getSolicitudesEmpresa({ estado: 'pendiente' }),
+        adminService.getSolicitudesReclutador({ estado: 'pendiente' }),
         adminService.getOfertasPendientes(),
       ]);
 
@@ -81,7 +83,6 @@ export default function AdminDashboardPage() {
       if (dashRes.status === 'fulfilled') {
         setStats(dashRes.value.data.data ?? dashRes.value.data);
       } else {
-        // Fallback legacy
         try {
           const legacyRes = await adminService.getStats();
           setStats(legacyRes.data.data ?? legacyRes.data);
@@ -96,6 +97,9 @@ export default function AdminDashboardPage() {
       if (epRes.status === 'fulfilled') {
         setEmpresasPendientes(epRes.value.data.data ?? epRes.value.data ?? []);
       }
+      if (rrRes.status === 'fulfilled') {
+        setReclutadoresPendientes(rrRes.value.data.data ?? rrRes.value.data ?? []);
+      }
       if (opRes.status === 'fulfilled') {
         setOfertasPendientes(opRes.value.data.data ?? opRes.value.data ?? []);
       }
@@ -108,14 +112,25 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { cargarDatos(); }, []);
 
+  // Aprobar/rechazar solicitudes de empresa (no empresas directas)
   const handleAprobarEmpresa = async (id) => {
-    await adminService.aprobarEmpresa(id);
+    await adminService.aprobarSolicitud(id);
     setEmpresasPendientes((prev) => prev.filter((e) => e.id !== id));
   };
   const handleRechazarEmpresa = async (id) => {
-    await adminService.rechazarEmpresa(id);
+    await adminService.rechazarSolicitud(id);
     setEmpresasPendientes((prev) => prev.filter((e) => e.id !== id));
   };
+  // Aprobar/rechazar solicitudes de reclutador
+  const handleAprobarReclutador = async (id) => {
+    await adminService.aprobarSolicitudReclutador(id);
+    setReclutadoresPendientes((prev) => prev.filter((r) => r.id !== id));
+  };
+  const handleRechazarReclutador = async (id) => {
+    await adminService.rechazarSolicitudReclutador(id);
+    setReclutadoresPendientes((prev) => prev.filter((r) => r.id !== id));
+  };
+
   const handleModerarOferta = async (id, aprobada) => {
     await adminService.moderarOferta(id, aprobada);
     setOfertasPendientes((prev) => prev.filter((o) => o.id !== id));
@@ -146,9 +161,9 @@ export default function AdminDashboardPage() {
       <div className="dashboard-header">
         <h1>Panel de Administración</h1>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <Link to="/admin/solicitudes" className="btn-primary">📋 Solicitudes de Empresa</Link>
+          <Link to="/admin/solicitudes" className="btn-secondary">📋 Solicitudes de Empresa</Link>
           <Link to="/admin/usuarios"   className="btn-secondary">👥 Usuarios</Link>
-          <Link to="/admin/logs"       className="btn-secondary">🗒️ Logs</Link>
+          <Link to="/admin/logs"       className="btn-secondary">🗒️ Historial de Accesos</Link>
         </div>
       </div>
 
@@ -207,22 +222,45 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* ── Empresas pendientes ────────────────────────────────────────────── */}
+      {/* ── Solicitudes de empresa pendientes ──────────────────────────────── */}
       <section className={styles.adminSection}>
-        <h2>Empresas Pendientes de Aprobación ({empresasPendientes.length})</h2>
+        <h2>Solicitudes de Empresa Pendientes ({empresasPendientes.length})</h2>
         {empresasPendientes.length === 0 ? (
-          <p className="msg">No hay empresas pendientes. ✅</p>
+          <p className="msg">No hay solicitudes pendientes. ✅</p>
         ) : (
           <div className={styles.pendientesList}>
             {empresasPendientes.map((e) => (
               <div key={e.id} className={styles.pendienteCard}>
                 <div>
                   <strong>{e.razonSocial}</strong>
-                  <p>{e.usuario?.nombre} {e.usuario?.apellido} — {e.usuario?.email}</p>
+                  <p>{e.email}{e.cuit ? ` — CUIT: ${e.cuit}` : ''}</p>
                 </div>
                 <div className={styles.pendienteActions}>
                   <button className="btn-ok"     onClick={() => handleAprobarEmpresa(e.id)}>✓ Aprobar</button>
                   <button className="btn-danger" onClick={() => handleRechazarEmpresa(e.id)}>✕ Rechazar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Solicitudes de reclutadores pendientes ───────────────────────────── */}
+      <section className={styles.adminSection}>
+        <h2>Solicitudes de Reclutadores Pendientes ({reclutadoresPendientes.length})</h2>
+        {reclutadoresPendientes.length === 0 ? (
+          <p className="msg">No hay solicitudes de reclutadores pendientes. ✅</p>
+        ) : (
+          <div className={styles.pendientesList}>
+            {reclutadoresPendientes.map((r) => (
+              <div key={r.id} className={styles.pendienteCard}>
+                <div>
+                  <strong>{r.nombre} {r.apellido}</strong>
+                  <p>{r.email}{r.empresa ? ` — ${r.empresa.razonSocial}` : ''}</p>
+                </div>
+                <div className={styles.pendienteActions}>
+                  <button className="btn-ok"     onClick={() => handleAprobarReclutador(r.id)}>✓ Aprobar</button>
+                  <button className="btn-danger" onClick={() => handleRechazarReclutador(r.id)}>✕ Rechazar</button>
                 </div>
               </div>
             ))}

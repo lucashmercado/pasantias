@@ -104,7 +104,7 @@ export default function AdminLogsPage() {
       {/* Cabecera */}
       <div className="dashboard-header">
         <div>
-          <h1>Logs del Sistema</h1>
+          <h1>Historial de Accesos</h1>
           <p className={styles.subtitle}>{loading ? '...' : `${total} registro${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}</p>
         </div>
         <button
@@ -174,7 +174,6 @@ export default function AdminLogsPage() {
                   <th>Entidad</th>
                   <th>Usuario responsable</th>
                   <th>IP</th>
-                  <th>Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,14 +214,6 @@ export default function AdminLogsPage() {
                         )}
                       </td>
                       <td className={styles.ipCell}>{log.ip || '—'}</td>
-                      <td className={styles.detalleCell}>
-                        {log.detalle ? (
-                          <details>
-                            <summary className={styles.detalleSummary}>Ver</summary>
-                            <pre className={styles.detallePre}>{JSON.stringify(log.detalle, null, 2)}</pre>
-                          </details>
-                        ) : '—'}
-                      </td>
                     </tr>
                   );
                 })}

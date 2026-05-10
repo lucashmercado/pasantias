@@ -28,6 +28,7 @@ async function crearSolicitud(req, res) {
       carrerasInteres,
       descripcion,
       puestos,
+      reclutadores,  // Array de { nombre, email } opcionales
     } = req.body;
 
     // ── Validación de campos obligatorios ──────────────────────────────────────
@@ -37,6 +38,14 @@ async function crearSolicitud(req, res) {
         message: 'Los campos razonSocial, cuit, rubro y email son obligatorios.',
       });
     }
+
+    // Normalizar reclutadores: filtrar los que tengan nombre y email completos
+    const reclutadoresLimpios = Array.isArray(reclutadores)
+      ? reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim()).map(r => ({
+          nombre: r.nombre.trim(),
+          email:  r.email.trim().toLowerCase(),
+        }))
+      : [];
 
     // ── Persistencia ───────────────────────────────────────────────────────────
     const solicitud = await SolicitudEmpresa.create({
@@ -53,6 +62,7 @@ async function crearSolicitud(req, res) {
         : (carrerasInteres ? JSON.parse(carrerasInteres) : []),
       descripcion: descripcion?.trim() || null,
       puestos: puestos?.trim() || null,
+      reclutadores: reclutadoresLimpios,  // Guardamos los reclutadores opcionales
       estado: 'pendiente',
     });
 

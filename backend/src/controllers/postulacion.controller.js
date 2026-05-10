@@ -18,6 +18,7 @@
 'use strict';
 
 const { Postulacion, Oferta, Usuario, Perfil, Empresa, Notificacion, Aval, ActivityLog } = require('../models');
+const { crearNotificacion } = require('../utils/notificador');
 
 // Helper: resuelve la empresa desde req.empresa (middleware) o por usuarioId (fallback)
 async function _resolverEmpresa(req) {
@@ -100,8 +101,8 @@ exports.postular = async (req, res) => {
     // ── Crear la postulación ──────────────────────────────────────────────
     const postulacion = await Postulacion.create({ usuarioId, ofertaId, cartaPresentacion });
 
-    // Notifica a la empresa que recibió una nueva postulación
-    await Notificacion.create({
+    // Notifica (BD + email) a la empresa que recibió una nueva postulación
+    await crearNotificacion({
       usuarioId: oferta.empresa.usuarioId,
       titulo: 'Nueva postulación recibida',
       mensaje: `${req.usuario.nombre} ${req.usuario.apellido} se postuló a "${oferta.titulo}".`,
@@ -342,7 +343,7 @@ exports.updateEstado = async (req, res) => {
 
     // Solo notifica si se cambió el estado (no cuando solo se actualizan notas)
     if (estado) {
-      await Notificacion.create({
+      await crearNotificacion({
         usuarioId: postulacion.usuarioId,
         titulo: estadoTexto[estado] || 'Estado actualizado',
         mensaje: `Tu postulación para "${postulacion.oferta.titulo}" cambió a: ${estado.replace(/_/g, ' ')}.`,

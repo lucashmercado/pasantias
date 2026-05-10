@@ -18,6 +18,7 @@
 
 const { Usuario, Perfil, Postulacion, Oferta, Empresa, Aval, Notificacion } = require('../models');
 const { Op } = require('sequelize');
+const { crearNotificacion } = require('../utils/notificador');
 
 // ── Listar alumnos ────────────────────────────────────────────────────────────
 /**
@@ -287,7 +288,7 @@ exports.updateAval = async (req, res) => {
 async function _notificarAlumnoAval(postulacion, aval, estado) {
   try {
     const esAprobado = estado === 'aprobado';
-    await Notificacion.create({
+    await crearNotificacion({
       usuarioId: postulacion.usuarioId,
       titulo: esAprobado
         ? `Tu aval fue aprobado — ${postulacion.oferta.titulo}`
@@ -386,9 +387,9 @@ exports.solicitarAval = async (req, res) => {
       mensajeAlumno: mensajeAlumno?.trim() || null,
     });
 
-    // Notifica al profesor que recibió una solicitud
+    // Notifica (BD + email) al profesor que recibió una solicitud de aval
     try {
-      await Notificacion.create({
+      await crearNotificacion({
         usuarioId: profesorId,
         titulo: `Solicitud de aval — ${postulacion.oferta?.titulo ?? 'Pasantía'}`,
         mensaje: mensajeAlumno?.trim()

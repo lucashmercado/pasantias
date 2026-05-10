@@ -16,6 +16,7 @@
 
 const { Mensaje, Usuario, Postulacion, Oferta, Empresa } = require('../models');
 const { Op } = require('sequelize');
+const { crearNotificacion } = require('../utils/notificador');
 
 // Estados de postulación que habilitan el chat
 const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'contratado'];
@@ -28,39 +29,44 @@ const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'co
  * Soporta ambas direcciones: alumno como emisor o como receptor.
  */
 async function tienePostulacionActiva(usuarioAId, usuarioBId) {
-  // Determinar cuál es alumno y cuál es empresa
-  const [uA, uB] = await Promise.all([
-    Usuario.findByPk(usuarioAId, { attributes: ['id', 'rol'] }),
-    Usuario.findByPk(usuarioBId, { attributes: ['id', 'rol'] }),
-  ]);
+  try {
+    const [uA, uB] = await Promise.all([
+      Usuario.findByPk(usuarioAId, { attributes: ['id', 'rol'] }),
+      Usuario.findByPk(usuarioBId, { attributes: ['id', 'rol'] }),
+    ]);
 
-  if (!uA || !uB) return false;
+    if (!uA || !uB) return false;
 
-  let alumnoId, empresaUserId;
-  if (['alumno', 'egresado'].includes(uA.rol) && uB.rol === 'empresa') {
-    alumnoId = uA.id; empresaUserId = uB.id;
-  } else if (['alumno', 'egresado'].includes(uB.rol) && uA.rol === 'empresa') {
-    alumnoId = uB.id; empresaUserId = uA.id;
-  } else {
-    return false; // Combinación de roles no válida
+    let alumnoId, empresaUserId;
+    if (['alumno', 'egresado'].includes(uA.rol) && uB.rol === 'empresa') {
+      alumnoId = uA.id; empresaUserId = uB.id;
+    } else if (['alumno', 'egresado'].includes(uB.rol) && uA.rol === 'empresa') {
+      alumnoId = uB.id; empresaUserId = uA.id;
+    } else {
+      return false; // Combinación de roles no válida para el chat
+    }
+
+    // Buscar la empresa asociada al usuario empresa
+    const empresa = await Empresa.findOne({ where: { usuarioId: empresaUserId } });
+    if (!empresa) return false;
+
+    // Buscar postulaciones del alumno a ofertas de esa empresa con estado habilitado
+    // ⚠️ El campo correcto es 'usuarioId', no 'alumnoId'
+    const postulacion = await Postulacion.findOne({
+      where: { usuarioId: alumnoId, estado: { [Op.in]: ESTADOS_CHAT_HABILITADO } },
+      include: [{
+        model: Oferta,
+        as: 'oferta',
+        where: { empresaId: empresa.id },
+        required: true,
+      }],
+    });
+
+    return postulacion !== null;
+  } catch (err) {
+    console.error('[Chat] Error en tienePostulacionActiva:', err.message);
+    return false;
   }
-
-  // Buscar la empresa asociada al usuario empresa
-  const empresa = await Empresa.findOne({ where: { usuarioId: empresaUserId } });
-  if (!empresa) return false;
-
-  // Buscar postulaciones del alumno a ofertas de esa empresa con estado habilitado
-  const postulacion = await Postulacion.findOne({
-    where: { alumnoId, estado: { [Op.in]: ESTADOS_CHAT_HABILITADO } },
-    include: [{
-      model: Oferta,
-      as: 'oferta',
-      where: { empresaId: empresa.id },
-      required: true,
-    }],
-  });
-
-  return postulacion !== null;
 }
 
 // ── Buscar usuarios para iniciar un nuevo chat ────────────────────────────────
@@ -227,6 +233,36 @@ exports.enviarMensaje = async (req, res) => {
       receptorId: Number(receptorId),
       mensaje: mensaje.trim(),
     });
+
+    // ── Notificar al receptor (BD + email) ─────────────────────────────────
+    // Anti-spam: solo enviar notificación si NO hay ya mensajes no leídos
+    // del mismo emisor para este receptor (evita un email por cada burbuja).
+    // El primer mensaje sin leer dispara la notificación; los siguientes no.
+    const mensajesPreviosSinLeer = await Mensaje.count({
+      where: {
+        emisorId,
+        receptorId: Number(receptorId),
+        leido: false,
+        id: { [Op.lt]: nuevoMensaje.id }, // mensajes anteriores al actual
+      },
+    });
+
+    if (mensajesPreviosSinLeer === 0) {
+      const emisor = await Usuario.findByPk(emisorId, { attributes: ['nombre', 'apellido'] });
+      const nombreEmisor = emisor ? `${emisor.nombre} ${emisor.apellido}`.trim() : 'Alguien';
+      const preview = mensaje.trim().length > 80
+        ? mensaje.trim().slice(0, 80) + '…'
+        : mensaje.trim();
+
+      crearNotificacion({
+        usuarioId: Number(receptorId),
+        titulo: `Nuevo mensaje de ${nombreEmisor}`,
+        mensaje: preview,
+        tipo: 'chat',
+        prioridad: 'normal',
+        enlace: `/chat/${emisorId}`,
+      }).catch((err) => console.error('[Chat] Error al notificar mensaje:', err.message));
+    }
 
     return res.status(201).json({
       success: true,

@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
 import styles from './PostulantesMiOfertaPage.module.css';
 
@@ -62,6 +62,7 @@ function CompatBar({ valor }) {
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function PostulantesMiOfertaPage() {
   const { ofertaId } = useParams();
+  const navigate = useNavigate();
 
   const [postulaciones, setPostulaciones] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -204,7 +205,25 @@ export default function PostulantesMiOfertaPage() {
                           {(p.usuario?.nombre?.[0] ?? '?').toUpperCase()}
                         </div>
                         <div className={styles.candidatoInfo}>
-                          <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                            {p.estado === 'contratado' && p.usuario?.id && (
+                              <button
+                                onClick={() => navigate(`/chat/${p.usuario.id}`)}
+                                title="Abrir chat con este candidato"
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                  background: '#16a34a', color: '#fff',
+                                  border: 'none', borderRadius: '20px',
+                                  padding: '2px 10px', fontSize: '0.75rem',
+                                  fontWeight: 600, cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                💬 Chatear
+                              </button>
+                            )}
+                          </div>
                           <span>{p.usuario?.email}</span>
                           {perfil.carrera && <span className={styles.carrera}>{perfil.carrera}</span>}
                         </div>
