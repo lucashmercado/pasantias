@@ -2,7 +2,7 @@
  * usuario.model.js — Modelo Sequelize para la tabla "usuarios".
  *
  * Representa a todas las personas que pueden acceder al sistema:
- * alumnos, egresados, empresas, profesores y administradores.
+ * alumnos, egresados, empresas y administradores.
  *
  * Campos destacados:
  * - rol: define qué tipo de usuario es y qué puede hacer en el sistema
@@ -12,7 +12,7 @@
  * - ultimoAcceso: se actualiza cada vez que el usuario hace una request autenticada
  *
  * Changelog:
- * - v1.1: agregado rol 'profesor', campos telefono, ubicacion, ultimoAcceso, fotoPerfil
+ * - v1.1: campos telefono, ubicacion, ultimoAcceso, fotoPerfil
  */
 
 'use strict';
@@ -50,7 +50,7 @@ module.exports = (sequelize) => {
     },
     // Rol del usuario en el sistema — determina sus permisos y flujos de registro
     rol: {
-      type: DataTypes.ENUM('alumno', 'egresado', 'empresa', 'profesor', 'admin'),
+      type: DataTypes.ENUM('alumno', 'egresado', 'empresa', 'admin'),
       allowNull: false,
       defaultValue: 'alumno',
     },

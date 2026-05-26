@@ -16,7 +16,7 @@
  *   razonSocial (solo empresa)
  * }
  *
- * Roles soportados: alumno | egresado | empresa | profesor | admin
+ * Roles soportados: alumno | egresado | empresa | admin
  *
  * Uso en componentes: const { usuario, login, logout } = useAuth()
  */
@@ -122,7 +122,6 @@ export const AuthProvider = ({ children }) => {
    */
   const esAdmin    = usuario?.rol === 'admin';
   const esEmpresa  = usuario?.rol === 'empresa';
-  const esProfesor = usuario?.rol === 'profesor';
   const esAlumno   = usuario?.rol === 'alumno' || usuario?.rol === 'egresado';
 
   return (
@@ -137,7 +136,6 @@ export const AuthProvider = ({ children }) => {
       // Helpers de rol (evitan repetir usuario?.rol === 'x' en cada componente)
       esAdmin,
       esEmpresa,
-      esProfesor,
       esAlumno,
     }}>
       {children}

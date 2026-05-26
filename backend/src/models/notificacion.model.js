@@ -4,7 +4,6 @@
  * Las notificaciones se generan automáticamente en los siguientes eventos:
  * - Cuando un alumno se postula a una oferta → notifica a la empresa
  * - Cuando la empresa cambia el estado de una postulación → notifica al alumno
- * - Cuando un profesor aprueba/rechaza un aval → notifica al alumno
  * - El admin puede generar notificaciones de sistema
  *
  * Las notificaciones se muestran en el ícono de campana del Navbar.
@@ -41,7 +40,7 @@ module.exports = (sequelize) => {
         'postulacion', // Nueva postulación recibida (dirigida a empresa)
         'estado',      // Cambio de estado en postulación (dirigida a alumno)
         'oferta',      // Relacionada a una oferta de trabajo
-        'aval',        // Profesor aprobó o rechazó un aval
+        'aval',        // (legacy) aval académico
         'chat',        // Nuevo mensaje de chat recibido
         'sistema'      // Mensaje general del sistema
       ),

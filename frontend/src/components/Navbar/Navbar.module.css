@@ -307,7 +307,6 @@
 .badge-activa          { background: var(--success); }
 .badge-pausada         { background: var(--warning); }
 .badge-cerrada         { background: #7f8c8d; }
-.badge-profesor        { background: var(--primary); color: #fff; }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {

@@ -85,14 +85,13 @@ async function logAction({ usuarioId, accion, entidad, entidadId, detalle, ip })
 router.get('/dashboard-general', ...soloAdmin, async (req, res) => {
   try {
     const [
-      alumnosActivos, egresadosActivos, profesoresActivos,
+      alumnosActivos, egresadosActivos,
       empresasAprobadas, totalUsuarios, ofertasActivas,
       ofertasPendiente, totalPostulaciones, contrataciones,
       entrevistas, notificacionesPendientes,
     ] = await Promise.all([
       Usuario.count({ where: { rol: 'alumno',   activo: true } }),
       Usuario.count({ where: { rol: 'egresado', activo: true } }),
-      Usuario.count({ where: { rol: 'profesor', activo: true } }),
       Empresa.count({ where: { estadoAprobacion: 'aprobada' } }),
       Usuario.count({ where: { activo: true } }),
       Oferta.count({ where: { estado: 'activa', moderada: true } }),
@@ -122,7 +121,7 @@ router.get('/dashboard-general', ...soloAdmin, async (req, res) => {
     return res.json({
       success: true,
       data: {
-        usuarios: { alumnosActivos, egresadosActivos, profesoresActivos, empresasAprobadas, totalActivos: totalUsuarios },
+        usuarios: { alumnosActivos, egresadosActivos, empresasAprobadas, totalActivos: totalUsuarios },
         pasantias: { ofertasActivas, ofertasPendienteModeracion: ofertasPendiente, totalPostulaciones, entrevistas, contrataciones, tasaInsercion },
         sistema: { notificacionesPendientes },
         actividadReciente,

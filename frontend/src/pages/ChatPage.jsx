@@ -46,7 +46,6 @@ const ROL_LABEL = {
   alumno:   '🎓 Alumno',
   egresado: '🏅 Egresado',
   empresa:  '🏢 Empresa',
-  profesor: '👨‍🏫 Profesor',
   admin:    '⚙️ Admin',
 };
 

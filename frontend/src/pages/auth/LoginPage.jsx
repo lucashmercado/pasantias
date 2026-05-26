@@ -57,7 +57,6 @@ export default function LoginPage() {
 
       if (usuario.rol === 'admin') navigate('/admin');
       else if (usuario.rol === 'empresa') navigate('/empresa');
-      else if (usuario.rol === 'profesor') navigate('/profesor');
       else navigate('/dashboard'); // alumno / egresado
     } catch (err) {
       setError(err.response?.data?.message || 'Error al iniciar sesión.');

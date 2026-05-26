@@ -3,7 +3,7 @@
  *
  * Changelog:
  * - v1.2: EmpresaUsuario (equipo de reclutadores)
- * - v1.3: Aval (avales de profesores), Mensaje (chat directo)
+ * - v1.3: Mensaje (chat directo)
  *         Notificacion añade prioridad, tipoVisual, accionURL
  * - v1.4: ActivityLog (auditoría de acciones del sistema)
  * - v1.5: SolicitudEmpresa (solicitudes de registro pendientes de aprobación)
@@ -20,7 +20,6 @@ const Oferta         = require('./oferta.model')(sequelize);
 const Postulacion    = require('./postulacion.model')(sequelize);
 const Notificacion   = require('./notificacion.model')(sequelize);
 const EmpresaUsuario = require('./empresaUsuario.model')(sequelize);
-const Aval           = require('./aval.model')(sequelize);
 const Mensaje        = require('./mensaje.model')(sequelize);
 const ActivityLog       = require('./activityLog.model')(sequelize);       // v1.4
 const SolicitudEmpresa  = require('./solicitudEmpresa.model')(sequelize);  // v1.5
@@ -54,14 +53,6 @@ EmpresaUsuario.belongsTo(Empresa, { foreignKey: 'empresaId', as: 'empresa' });
 EmpresaUsuario.belongsTo(Usuario, { foreignKey: 'usuarioId', as: 'usuario' });
 Usuario.hasMany(EmpresaUsuario, { foreignKey: 'usuarioId', as: 'membresiasEmpresa', onDelete: 'CASCADE' });
 
-// ── Asociaciones — Aval (v1.3) ────────────────────────────────────────────────
-// Una Postulacion puede tener muchos Avales (de distintos profesores)
-Postulacion.hasMany(Aval, { foreignKey: 'postulacionId', as: 'avales', onDelete: 'CASCADE' });
-Aval.belongsTo(Postulacion, { foreignKey: 'postulacionId', as: 'postulacion' });
-
-// El Profesor (usuario) emite el Aval
-Usuario.hasMany(Aval, { foreignKey: 'profesorId', as: 'avalesEmitidos', onDelete: 'CASCADE' });
-Aval.belongsTo(Usuario, { foreignKey: 'profesorId', as: 'profesor' });
 
 // ── Asociaciones — Mensaje / Chat (v1.3) ──────────────────────────────────────
 // Un usuario puede haber enviado muchos mensajes
@@ -92,7 +83,6 @@ module.exports = {
   Postulacion,
   Notificacion,
   EmpresaUsuario,   // v1.2 — equipo de reclutadores
-  Aval,             // v1.3 — avales de profesores
   Mensaje,          // v1.3 — chat directo entre usuarios
   ActivityLog,      // v1.4 — auditoría del sistema
   SolicitudEmpresa, // v1.5 — solicitudes de registro de empresa

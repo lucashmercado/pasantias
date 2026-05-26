@@ -17,7 +17,7 @@
 
 'use strict';
 
-const { Postulacion, Oferta, Usuario, Perfil, Empresa, Notificacion, Aval, ActivityLog } = require('../models');
+const { Postulacion, Oferta, Usuario, Perfil, Empresa, Notificacion, ActivityLog } = require('../models');
 const { crearNotificacion } = require('../utils/notificador');
 
 // Helper: resuelve la empresa desde req.empresa (middleware) o por usuarioId (fallback)
@@ -157,16 +157,6 @@ exports.getMisPostulaciones = async (req, res) => {
           as: 'oferta',
           include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'logo', 'ciudad', 'rubro'] }],
         },
-        {
-          model: Aval,
-          as: 'avales',
-          required: false,
-          include: [{
-            model: Usuario,
-            as: 'profesor',
-            attributes: ['id', 'nombre', 'apellido', 'email'],
-          }],
-        },
       ],
       order: [['createdAt', 'DESC']],
     });
@@ -210,22 +200,6 @@ exports.getPostulacionesByOferta = async (req, res) => {
         include: [{ model: Perfil, as: 'perfil' }],
       },
     ];
-
-    // Intenta incluir avales académicos (puede no existir la columna en BD antigua)
-    try {
-      includes.push({
-        model: Aval,
-        as: 'avales',
-        required: false,
-        include: [{
-          model: Usuario,
-          as: 'profesor',
-          attributes: ['id', 'nombre', 'apellido'],
-        }],
-      });
-    } catch (avalIncludeError) {
-      console.warn('⚠️ No se pudo incluir avales en la query:', avalIncludeError.message);
-    }
 
     // Trae postulaciones con perfil completo del candidato y sus avales académicos
     const postulaciones = await Postulacion.findAll({

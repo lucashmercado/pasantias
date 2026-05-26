@@ -82,10 +82,6 @@ export default function Navbar() {
     { to: '/empresa/equipo', label: 'Equipo' },
   ];
 
-  const linksProfesor = [
-    { to: '/profesor', label: 'Panel Profesor' },
-    { to: '/profesor/avales', label: 'Avales' },
-  ];
 
   const linksAdmin = [
     { to: '/admin', label: 'Dashboard' },
@@ -98,7 +94,6 @@ export default function Navbar() {
     switch (usuario.rol) {
       case 'admin': return linksAdmin;
       case 'empresa': return linksEmpresa;
-      case 'profesor': return linksProfesor;
       case 'alumno':
       case 'egresado':
       default: return linksAlumnoEgresado;

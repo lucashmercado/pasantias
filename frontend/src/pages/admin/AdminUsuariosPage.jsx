@@ -21,7 +21,6 @@ const ROL_BADGE = {
   alumno:   { label: 'Alumno',   color: '#0073AD' },
   egresado: { label: 'Egresado', color: '#8e44ad' },
   empresa:  { label: 'Empresa',  color: '#e67e22' },
-  profesor: { label: 'Profesor', color: '#16a085' },
   admin:    { label: 'Admin',    color: '#c0392b' },
 };
 

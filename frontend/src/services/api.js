@@ -136,27 +136,6 @@ export const adminService = {
   rechazarSolicitudReclutador:   (id, motivo) => api.patch(`/admin/solicitudes-reclutador/${id}/rechazar`, { motivo }),
 };
 
-// ── Servicio del profesor ───────────────────────────────────────────────────
-// Funciones para los endpoints de /api/profesor (accesibles con rol profesor o admin)
-export const profesorService = {
-  getMisAlumnos:       () => api.get('/profesor/alumnos'),
-  getPostulaciones:    () => api.get('/profesor/postulaciones'),
-  // El backend no tiene /pendientes — usa query param ?estado=pendiente
-  getAvalesPendientes: () => api.get('/profesor/avales', { params: { estado: 'pendiente' } }),
-  getAvales:           () => api.get('/profesor/avales'),
-
-  // Método unificado para crear/editar cualquier decisión sobre un aval
-  updateAval: (id, estado, comentario) =>
-    api.patch(`/profesor/avales/${id}`, { estado, comentario }),
-
-  // Atajos específicos (mantienen retrocompatibilidad)
-  aprobarAval:  (id, comentario) => api.patch(`/profesor/avales/${id}`, { estado: 'aprobado', comentario }),
-  rechazarAval: (id, motivo)    => api.patch(`/profesor/avales/${id}`, { estado: 'rechazado', comentario: motivo }),
-
-  // Accesibles por el alumno
-  listarProfesores: () => api.get('/profesor/lista'),
-  solicitarAval:    (data) => api.post('/profesor/solicitar-aval', data),
-};
 
 
 // ── Servicio de mensajes (chat) ─────────────────────────────────────────────

@@ -7,7 +7,7 @@
  * - GET /               → Lista todas las ofertas activas y aprobadas
  * - GET /:id            → Detalle de una oferta específica
  *
- * Rutas protegidas (alumno/egresado/profesor):
+ * Rutas protegidas (alumno/egresado):
  * - GET /recomendadas   → Buscador inteligente basado en el perfil del alumno [NUEVO]
  *
  * Rutas protegidas (solo empresas):
@@ -27,11 +27,11 @@ const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/em
 // ── Rutas con path fijo (deben ir ANTES de /:id) ─────────────────────────────
 
 // GET /api/ofertas/recomendadas — Ofertas sugeridas según el perfil del alumno
-// Requiere autenticación; accesible para alumnos, egresados y profesores
+// Requiere autenticación; accesible para alumnos y egresados
 router.get(
   '/recomendadas',
   verifyToken,
-  authorizeRoles('alumno', 'egresado', 'profesor'),
+  authorizeRoles('alumno', 'egresado'),
   ctrl.getOfertasRecomendadas
 );
 

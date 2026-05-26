@@ -39,13 +39,6 @@ const ROLES = [
     desc:    'Busco pasantes para mi organización',
     pending: true,
   },
-  {
-    value:   'profesor',
-    label:   'Profesor',
-    emoji:   '👨‍🏫',
-    desc:    'Otorgo avales académicos a mis alumnos',
-    pending: true,
-  },
 ];
 
 /* ── Evaluador de fuerza de contraseña ───────────────────────────────────── */
@@ -134,7 +127,7 @@ export default function RegisterPage() {
       const data = await register(payload);
 
       if (rolActual?.pending) {
-        // empresa / profesor → aviso + redirige al login
+        // empresa → aviso + redirige al login
         navigate('/login', {
           state: { mensaje: data.message || 'Cuenta creada. Aguardá la aprobación del administrador.' }
         });

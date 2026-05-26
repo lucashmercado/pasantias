@@ -342,7 +342,6 @@ select { cursor: pointer; }
 /* ── Badges de rol ─────────────────────────────────────────────────────────── */
 .badge-admin    { background: #8e44ad; }
 .badge-empresa  { background: #1a5276; }
-.badge-profesor { background: #1a6d3a; }
 .badge-alumno   { background: var(--primary); }
 .badge-egresado { background: #2471a3; }
 

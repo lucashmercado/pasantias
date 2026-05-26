@@ -4,7 +4,7 @@
  * Prefijo de la API: /api/students
  *
  * Todas las rutas requieren autenticación.
- * Accesibles para roles: alumno, egresado, profesor.
+ * Accesibles para roles: alumno, egresado.
  *
  * Rutas disponibles:
  * - GET /dashboard → Métricas personales del alumno (stats + recomendadas + completitud)
@@ -21,7 +21,7 @@ const { getDashboard } = require('../controllers/student.controller');
 router.get(
   '/dashboard',
   verifyToken,
-  authorizeRoles('alumno', 'egresado', 'profesor'),
+  authorizeRoles('alumno', 'egresado'),
   getDashboard
 );
 

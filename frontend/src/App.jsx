@@ -70,7 +70,7 @@ import TopBanner from './components/TopBanner/TopBanner';
  * - Si todo está bien: renderiza el componente hijo
  *
  * @param {React.ReactNode} children - Componente de la página protegida
- * @param {string[]} roles - Array de roles permitidos. Ej: ['admin', 'profesor']
+ * @param {string[]} roles - Array de roles permitidos. Ej: ['admin', 'empresa']
  *                           Si se omite, cualquier usuario autenticado puede acceder.
  * @param {string} redirectTo - Ruta de redirección si no tiene acceso (por defecto '/')
  */

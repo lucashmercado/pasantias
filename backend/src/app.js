@@ -54,7 +54,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/auth',          require('./routes/auth.routes'));         // Autenticación y registro
 app.use('/api/users',         require('./routes/user.routes'));         // Perfil y CV del usuario
 app.use('/api/students',      require('./routes/student.routes'));      // Panel del alumno (dashboard, recomendadas)
-app.use('/api/profesor',      require('./routes/profesor.routes'));     // Panel institucional del profesor
 app.use('/api/chat',          require('./routes/chat.routes'));         // Mensajería directa entre usuarios
 app.use('/api/empresas',      require('./routes/empresa.routes'));      // Perfil y panel corporativo de empresa
 app.use('/api/ofertas',       require('./routes/oferta.routes'));       // Publicaciones de pasantías
