@@ -49,6 +49,10 @@ module.exports = (sequelize) => {
         'cerrar_oferta',
         'postular',
         'cambiar_estado_postulacion',
+        'aprobar_solicitud_empresa',
+        'rechazar_solicitud_empresa',
+        'aprobar_solicitud_reclutador',
+        'rechazar_solicitud_reclutador',
         'sistema'
       ),
       allowNull: false,

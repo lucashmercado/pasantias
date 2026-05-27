@@ -3,7 +3,7 @@
  *
  * Implementa chat 1-a-1 entre alumnos/egresados y reclutadores (empresa).
  * El chat solo está disponible cuando existe una postulación en estado activo
- * (preseleccionado, entrevista_programada o contratado) entre las dos partes.
+ * (preseleccionado, entrevista_programada, entrevista o contratado) entre las dos partes.
  *
  * Endpoints:
  * - GET  /api/chat                → Lista de conversaciones del usuario autenticado
@@ -19,7 +19,7 @@ const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 
 // Estados de postulación que habilitan el chat
-const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'contratado'];
+const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
 
 // ── Helper: verificar que el par tenga postulación activa ─────────────────────
 /**
