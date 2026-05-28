@@ -7,17 +7,17 @@
  * - POST /          → Se postula a una oferta
  * - GET  /mis       → Historial de postulaciones propias
  *
- * Rutas para empresas (propietario, gerente y reclutador pueden ver y gestionar):
+ * Rutas para empresas (admin_empresa y reclutador pueden ver y gestionar):
  * - GET  /oferta/:ofertaId  → Ver candidatos de una oferta
  * - PATCH /:id/estado       → Actualizar el estado de una postulación
  *
- * Viewers solo pueden ver (no pueden cambiar estados).
+ * Todos los miembros activos pueden ver; ambos roles pueden cambiar estados.
  *
  * Changelog:
  * - v1.0: implementación inicial
  * - v1.5: rutas de empresa usan verifyEmpresaMember para inyectar req.empresa
  *         · GET /oferta/:ofertaId → cualquier miembro del equipo
- *         · PATCH /:id/estado     → propietario, gerente y reclutador
+ *         · PATCH /:id/estado     → admin_empresa y reclutador
  */
 
 const router = require('express').Router();
@@ -34,18 +34,18 @@ router.get('/mis', verifyToken, authorizeRoles('alumno', 'egresado'), ctrl.getMi
 // Shorthand: token + rol sistema 'empresa' + membresía en equipo
 const baseMiembroEmpresa = [verifyToken, authorizeRoles('empresa'), verifyEmpresaMember];
 
-// Ver candidatos de una oferta — cualquier miembro del equipo (incluye viewers)
+// Ver candidatos de una oferta — cualquier miembro activo del equipo
 router.get(
   '/oferta/:ofertaId',
   ...baseMiembroEmpresa,
   ctrl.getPostulacionesByOferta
 );
 
-// Cambiar estado de una postulación — propietario, gerente y reclutador (NO viewers)
+// Cambiar estado de una postulación — admin_empresa y reclutador
 router.patch(
   '/:id/estado',
   ...baseMiembroEmpresa,
-  authorizeEmpresaRoles('propietario', 'gerente', 'reclutador'),
+  authorizeEmpresaRoles('admin_empresa', 'reclutador'),
   ctrl.updateEstado
 );
 

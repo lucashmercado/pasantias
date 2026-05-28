@@ -2,7 +2,7 @@
  * EquipoPage.jsx — Gestión del equipo reclutador de la empresa.
  *
  * Ruta: /empresa/equipo
- * Acceso: solo propietario puede enviar solicitudes y gestionar miembros.
+ * Acceso: solo admin_empresa puede enviar solicitudes y gestionar miembros.
  *         otros roles pueden ver (solo lectura).
  *
  * Flujo de alta de reclutadores:
@@ -17,10 +17,10 @@ import { empresaService } from '../../services/api';
 import styles from './EquipoPage.module.css';
 
 /* ── Helpers ─────────────────────────────────────────────────────────────────── */
-const ROL_COLORS = { propietario: '#7c3aed', gerente: '#2563eb', reclutador: '#0891b2', viewer: '#64748b' };
+const ROL_COLORS = { admin_empresa: '#7c3aed', reclutador: '#0891b2' };
 function rolColor(rol) { return ROL_COLORS[rol] ?? '#64748b'; }
 function rolLabel(rol) {
-  return { propietario: 'Propietario', gerente: 'Gerente', reclutador: 'Reclutador', viewer: 'Solo lectura' }[rol] ?? rol;
+  return { admin_empresa: 'Administrador', reclutador: 'Reclutador' }[rol] ?? rol;
 }
 function formatFecha(iso) {
   if (!iso) return 'Nunca';
@@ -182,10 +182,9 @@ function ModalCambiarPassword({ miembro, onClose, onGuardado }) {
 }
 
 /* ── Modal: Editar rol ──────────────────────────────────────────────────────── */
+// Solo reclutador es asignable manualmente; admin_empresa lo define el flujo de aprobación
 const ROLES = [
-  { value: 'reclutador', label: 'Reclutador',   color: '#0891b2', desc: 'Crea ofertas y gestiona candidatos' },
-  { value: 'gerente',    label: 'Gerente',       color: '#2563eb', desc: 'Gestiona el perfil y el equipo' },
-  { value: 'viewer',     label: 'Solo lectura',  color: '#64748b', desc: 'Solo puede visualizar' },
+  { value: 'reclutador', label: 'Reclutador', color: '#0891b2', desc: 'Crea ofertas y gestiona candidatos' },
 ];
 
 function ModalEditarRol({ miembro, onClose, onGuardado }) {
@@ -244,7 +243,7 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
   const u = miembro.usuario ?? miembro;
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const inicial = nombre[0]?.toUpperCase() ?? '?';
-  const esProp = miembro.rolInterno === 'propietario';
+  const esProp = miembro.rolInterno === 'admin_empresa';
 
   return (
     <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
@@ -252,7 +251,7 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
       <div className={styles.cardInfo}>
         <div className={styles.cardNombre}>
           <strong>{nombre}</strong>
-          {esProp && <span className={styles.propietarioBadge}>Propietario</span>}
+          {esProp && <span className={styles.propietarioBadge}>Administrador</span>}
           {!miembro.activo && <span className={styles.suspendidoBadge}>Suspendido</span>}
         </div>
         <span className={styles.cardEmail}>{u.email}</span>
@@ -307,7 +306,7 @@ export default function EquipoPage() {
   const [modalPwd,        setModalPwd]        = useState(null);
   const [modalSuspender,  setModalSuspender]  = useState(null); // miembro a suspender/reactivar
 
-  const esPropietario = rolEnEquipo === 'propietario';
+  const esPropietario = rolEnEquipo === 'admin_empresa';
   const activos    = equipo.filter(m => m.activo !== false);
   const suspendidos = equipo.filter(m => m.activo === false);
 

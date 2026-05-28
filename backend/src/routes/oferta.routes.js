@@ -40,14 +40,14 @@ router.get(
 router.get('/', ctrl.getOfertas);           // Lista de ofertas con filtros opcionales
 router.get('/:id', ctrl.getOfertaById);     // Detalle de una oferta y su empresa
 
-// ── Rutas empresa (propietario, gerente y reclutador pueden crear/editar ofertas) ──────────
+// ── Rutas empresa (admin_empresa y reclutador pueden crear/editar ofertas) ─────
 // verifyEmpresaMember inyecta req.empresa para los controllers
 // authorizeEmpresaRoles restringe a los roles con permisos de escritura
 const puedeEscribirOferta = [
   verifyToken,
   authorizeRoles('empresa'),
   verifyEmpresaMember,
-  authorizeEmpresaRoles('propietario', 'gerente', 'reclutador'),
+  authorizeEmpresaRoles('admin_empresa', 'reclutador'),
 ];
 
 router.post('/', ...puedeEscribirOferta, ctrl.createOferta);      // Crear oferta

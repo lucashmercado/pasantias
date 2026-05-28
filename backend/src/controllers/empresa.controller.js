@@ -6,17 +6,14 @@
  * - getMiEmpresa      → GET /api/empresas/mi-empresa
  * - updateMiEmpresa   → PUT /api/empresas/mi-empresa
  * - getEquipo         → GET /api/empresas/equipo
- * - addMiembro        → POST /api/empresas/equipo
+ * - addMiembro        → POST /api/empresas/equipo (legacy; flujo nuevo usa solicitarReclutador)
  * - updateMiembro     → PATCH /api/empresas/equipo/:id
  * - removeMiembro     → DELETE /api/empresas/equipo/:id
  *
  * Changelog:
  * - v1.0: implementación inicial
  * - v1.5: refactor multi-usuario
- *         · getDashboard / getMisOfertas / getMiEmpresa usan req.empresa del middleware
- *         · addMiembro crea usuario automáticamente si no existe (contraseña temporal)
- *         · addMiembro / updateMiembro / removeMiembro solo accesibles por propietario
- *         · updateMiembro no permite cambiar el rol del propietario ni autopromoverse
+ * - v2.0: roles internos simplificados a admin_empresa/reclutador
  */
 
 'use strict';
@@ -57,7 +54,7 @@ async function _resolverEmpresa(req) {
 /**
  * GET /api/empresas/dashboard
  * Devuelve en una sola llamada las métricas del panel corporativo.
- * Accesible para todos los roles del equipo (propietario, gerente, reclutador, viewer).
+ * Accesible para todos los miembros del equipo (admin_empresa y reclutador).
  */
 exports.getDashboard = async (req, res) => {
   try {
@@ -234,32 +231,32 @@ exports.getEquipo = async (req, res) => {
       ],
     });
 
-    // ── Garantizar que el propietario aparezca ────────────────────────────────
-    // Si el propietario directo (empresa.usuarioId) no tiene registro en empresa_usuarios
+    // ── Garantizar que el admin_empresa aparezca ──────────────────────────────
+    // Si el admin_empresa directo (empresa.usuarioId) no tiene registro en empresa_usuarios
     // (cuentas creadas antes de la feature multi-usuario), lo agregamos virtualmente
     // para que el frontend lo muestre y pueda detectar correctamente su rol.
-    const propietarioPresenteEnTabla = equipo.some(
+    const adminPresenteEnTabla = equipo.some(
       (m) => m.usuarioId === empresa.usuarioId
     );
 
     let data = equipo.map((m) => m.toJSON());
 
-    if (!propietarioPresenteEnTabla) {
-      // Busca los datos del usuario propietario para construir el objeto virtual
-      const usuarioPropietario = await Usuario.findByPk(empresa.usuarioId, {
+    if (!adminPresenteEnTabla) {
+      // Busca los datos del usuario admin para construir el objeto virtual
+      const usuarioAdmin = await Usuario.findByPk(empresa.usuarioId, {
         attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil', 'ultimoAcceso'],
       });
 
-      if (usuarioPropietario) {
-        // Inserta al propietario al inicio de la lista (tiene precedencia)
+      if (usuarioAdmin) {
+        // Inserta al admin al inicio de la lista (tiene precedencia)
         data.unshift({
           id: null,                           // No tiene ID en empresa_usuarios
           empresaId: empresa.id,
           usuarioId: empresa.usuarioId,
-          rolInterno: 'propietario',
+          rolInterno: 'admin_empresa',
           activo: true,
-          esPropietarioVirtual: true,         // Flag para que el frontend lo sepa
-          usuario: usuarioPropietario.toJSON(),
+          esAdminVirtual: true,               // Flag para que el frontend lo sepa
+          usuario: usuarioAdmin.toJSON(),
           createdAt: empresa.createdAt,
           updatedAt: empresa.updatedAt,
         });
@@ -268,7 +265,7 @@ exports.getEquipo = async (req, res) => {
 
     // ── Incluir el rol del solicitante en la respuesta ────────────────────────
     // Esto permite que el frontend detecte el rol sin tener que buscarse en la lista
-    const rolEnEquipo = req.miembroEmpresa?.rolInterno ?? 'propietario';
+    const rolEnEquipo = req.miembroEmpresa?.rolInterno ?? 'admin_empresa';
 
     return res.json({ success: true, total: data.length, rolEnEquipo, data });
   } catch (error) {
@@ -284,7 +281,7 @@ exports.getEquipo = async (req, res) => {
  *
  * Body:
  *   email      {string} — email del usuario a agregar o crear
- *   rolInterno {string} — 'gerente' | 'reclutador' | 'viewer' (default: 'reclutador')
+ *   rolInterno {string} — 'reclutador' (único rol asignable; default: 'reclutador')
  *   password   {string} — contraseña inicial (obligatoria si el usuario no existe)
  *   nombre     {string} — nombre (solo si el usuario no existe)
  *   apellido   {string} — apellido (solo si el usuario no existe)
@@ -311,12 +308,12 @@ exports.addMiembro = async (req, res) => {
       return res.status(400).json({ success: false, message: 'El email es requerido.' });
     }
 
-    // Validar que el rol sea válido (no se puede invitar como propietario)
-    const rolesPermitidos = ['gerente', 'reclutador', 'viewer'];
+    // Validar que el rol sea válido (no se puede invitar como admin_empresa)
+    const rolesPermitidos = ['reclutador'];
     if (!rolesPermitidos.includes(rolInterno)) {
       return res.status(400).json({
         success: false,
-        message: `Rol inválido. Roles disponibles: ${rolesPermitidos.join(', ')}.`,
+        message: `Rol inválido. Solo se puede agregar como 'reclutador'.`,
       });
     }
 
@@ -450,12 +447,12 @@ exports.resetPasswordMiembro = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Miembro no encontrado.' });
     }
 
-    // No se puede resetear la contraseña del propietario desde este endpoint
-    // (el propietario gestiona la suya desde su perfil personal)
-    if (miembro.rolInterno === 'propietario') {
+    // No se puede resetear la contraseña del admin_empresa desde este endpoint
+    // (el admin gestiona la suya desde su perfil personal)
+    if (miembro.rolInterno === 'admin_empresa') {
       return res.status(403).json({
         success: false,
-        message: 'No podés cambiar la contraseña del propietario desde el panel de equipo. Usá la opción de perfil personal.',
+        message: 'No podés cambiar la contraseña del administrador desde el panel de equipo. Usá la opción de perfil personal.',
       });
     }
 
@@ -485,12 +482,12 @@ exports.resetPasswordMiembro = async (req, res) => {
  * Solo el propietario puede modificar miembros.
  *
  * Body (al menos uno requerido):
- *   rolInterno {string}  — nuevo rol ('gerente' | 'reclutador' | 'viewer')
+ *   rolInterno {string}  — nuevo rol (solo 'reclutador' es válido)
  *   activo     {boolean} — true para reactivar, false para suspender
  *
  * Restricciones:
- * - No se puede modificar al propietario
- * - No se puede asignar el rol 'propietario' a otro miembro
+ * - No se puede modificar al admin_empresa mediante este endpoint
+ * - No se puede asignar admin_empresa a otro miembro
  */
 exports.updateMiembro = async (req, res) => {
   try {
@@ -502,11 +499,11 @@ exports.updateMiembro = async (req, res) => {
     });
     if (!miembro) return res.status(404).json({ success: false, message: 'Miembro no encontrado.' });
 
-    // No se puede modificar al propietario
-    if (miembro.rolInterno === 'propietario') {
+    // No se puede modificar al admin_empresa mediante este endpoint
+    if (miembro.rolInterno === 'admin_empresa') {
       return res.status(403).json({
         success: false,
-        message: 'No se puede modificar al propietario del equipo.',
+        message: 'No se puede modificar al administrador de empresa desde el panel de equipo.',
       });
     }
 
@@ -514,18 +511,18 @@ exports.updateMiembro = async (req, res) => {
     const updateData = {};
 
     if (rolInterno !== undefined) {
-      // No se puede asignar el rol propietario a través de este endpoint
-      if (rolInterno === 'propietario') {
+      // No se puede asignar admin_empresa a través de este endpoint
+      if (rolInterno === 'admin_empresa') {
         return res.status(400).json({
           success: false,
-          message: 'No se puede asignar el rol propietario a otro miembro.',
+          message: 'No se puede asignar el rol admin_empresa a otro miembro.',
         });
       }
-      const rolesValidos = ['gerente', 'reclutador', 'viewer'];
+      const rolesValidos = ['reclutador'];
       if (!rolesValidos.includes(rolInterno)) {
         return res.status(400).json({
           success: false,
-          message: `Rol inválido. Roles disponibles: ${rolesValidos.join(', ')}.`,
+          message: `Rol inválido. Solo se puede asignar 'reclutador'.`,
         });
       }
       updateData.rolInterno = rolInterno;
@@ -556,10 +553,10 @@ exports.removeMiembro = async (req, res) => {
     });
     if (!miembro) return res.status(404).json({ success: false, message: 'Miembro no encontrado.' });
 
-    if (miembro.rolInterno === 'propietario') {
+    if (miembro.rolInterno === 'admin_empresa') {
       return res.status(403).json({
         success: false,
-        message: 'No se puede eliminar al propietario del equipo.',
+        message: 'No se puede eliminar al administrador de empresa.',
       });
     }
 

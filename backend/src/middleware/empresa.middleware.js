@@ -9,11 +9,11 @@
  * │  en req.empresa y req.miembroEmpresa para que los controllers la usen.      │
  * │                                                                             │
  * │  Flujo de resolución (en orden):                                            │
- * │    1. Si el usuario es propietario directo (empresa.usuarioId === req.usuario.id) │
- * │       → adjunta empresa y crea un objeto miembro virtual con rol 'propietario' │
+ * │    1. Si el usuario es admin_empresa directo (empresa.usuarioId === req.usuario.id) │
+ * │       → adjunta empresa y crea un objeto miembro virtual con rol 'admin_empresa' │
  * │    2. Si tiene una membresía activa en empresa_usuarios                      │
  * │       → adjunta empresa y el registro de membresía real                     │
- * │    3. Si no tiene acceso → 403                                              │
+ * │    3. Si no tiene acceso → 404                                              │
  * └─────────────────────────────────────────────────────────────────────────────┘
  *
  * ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -22,29 +22,30 @@
  * │  Debe usarse siempre DESPUÉS de verifyEmpresaMember.                       │
  * └─────────────────────────────────────────────────────────────────────────────┘
  *
+ * Roles internos disponibles:
+ *   admin_empresa → acceso completo (editar empresa, gestionar equipo, ofertas, postulaciones)
+ *   reclutador    → acceso operativo (ofertas, postulaciones, chat); sin gestión de equipo
+ *
  * Ejemplo de uso en rutas:
  *   const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
  *
  *   // Cualquier miembro activo puede ver el dashboard
  *   router.get('/dashboard', verifyToken, verifyEmpresaMember, ctrl.getDashboard);
  *
- *   // Solo el propietario puede gestionar el equipo
- *   router.post('/equipo', verifyToken, verifyEmpresaMember, authorizeEmpresaRoles('propietario'), ctrl.addMiembro);
- *
- *   // Propietario y gerente pueden editar el perfil
- *   router.put('/mi-empresa', verifyToken, verifyEmpresaMember, authorizeEmpresaRoles('propietario', 'gerente'), ctrl.updateMiEmpresa);
+ *   // Solo admin_empresa puede gestionar el equipo
+ *   router.post('/equipo', verifyToken, verifyEmpresaMember, authorizeEmpresaRoles('admin_empresa'), ctrl.addMiembro);
  *
  * Changelog:
- * - v1.5: creación inicial
+ * - v1.5: creación inicial (propietario/gerente/reclutador/viewer)
+ * - v2.0: simplificación a admin_empresa/reclutador — migración 010
  */
 
 'use strict';
 
 const { Empresa, EmpresaUsuario } = require('../models');
 
-// ── Jerarquía de roles (de mayor a menor privilegio) ──────────────────────────
-// Se usa para verificar si un rol tiene acceso a una acción que acepta múltiples niveles
-const JERARQUIA_ROLES = ['propietario', 'gerente', 'reclutador', 'viewer'];
+// ── Roles disponibles (admin_empresa tiene más privilegios que reclutador) ─────
+const JERARQUIA_ROLES = ['admin_empresa', 'reclutador'];
 
 /**
  * Middleware: resuelve la empresa del usuario autenticado y la adjunta al request.
@@ -61,25 +62,25 @@ const verifyEmpresaMember = async (req, res, next) => {
   try {
     const usuarioId = req.usuario.id;
 
-    // ── 1. Verificar si es propietario directo de la empresa ──────────────────
-    // El propietario tiene empresa.usuarioId === su id
+    // ── 1. Verificar si es admin_empresa directo (empresa.usuarioId === su id) ─
+    // Compatibilidad con cuentas donde el usuario es el dueño registrado de la empresa
+    // pero puede no tener todavía registro en empresa_usuarios.
     const empresaPropia = await Empresa.findOne({ where: { usuarioId } });
 
     if (empresaPropia) {
       req.empresa = empresaPropia;
-      // Construye un objeto virtual de membresía para propietarios directos
-      // (pueden no tener registro en empresa_usuarios si la cuenta es anterior a la feature)
+      // Construye un objeto virtual de membresía para el admin_empresa directo
       req.miembroEmpresa = {
-        rolInterno: 'propietario',
+        rolInterno: 'admin_empresa',
         activo: true,
         empresaId: empresaPropia.id,
         usuarioId,
-        esPropietarioVirtual: true, // Indica que no es un registro real de empresa_usuarios
+        esAdminVirtual: true, // Indica que no es un registro real de empresa_usuarios
       };
       return next();
     }
 
-    // ── 2. Verificar si es miembro del equipo (reclutador, gerente, viewer) ───
+    // ── 2. Verificar si es miembro del equipo (admin_empresa o reclutador) ────
     const membresia = await EmpresaUsuario.findOne({
       where: { usuarioId, activo: true },
       include: [{ model: Empresa, as: 'empresa' }],
@@ -88,7 +89,7 @@ const verifyEmpresaMember = async (req, res, next) => {
     if (!membresia) {
       return res.status(404).json({
         success: false,
-        message: 'No tenés acceso a ninguna empresa. Necesitás ser invitado por un propietario.',
+        message: 'No tenés acceso a ninguna empresa. Necesitás ser invitado por un administrador.',
         code: 'SIN_EMPRESA',
       });
     }
@@ -105,20 +106,17 @@ const verifyEmpresaMember = async (req, res, next) => {
 /**
  * Middleware factory: verifica que el rol interno del usuario esté en la lista permitida.
  *
- * El propietario siempre tiene acceso total (se incluye automáticamente).
+ * Roles disponibles: 'admin_empresa' | 'reclutador'
  *
- * Jerarquía de roles disponibles:
- *   'propietario' > 'gerente' > 'reclutador' > 'viewer'
- *
- * @param  {...string} roles - Roles permitidos (además del propietario que siempre puede)
+ * @param  {...string} roles - Roles permitidos
  * @returns {Function} Middleware de Express
  *
  * @example
- *   // Solo propietario puede gestionar equipo
- *   authorizeEmpresaRoles('propietario')
+ *   // Solo admin_empresa puede gestionar equipo
+ *   authorizeEmpresaRoles('admin_empresa')
  *
- *   // Propietario, gerente y reclutador pueden crear ofertas
- *   authorizeEmpresaRoles('propietario', 'gerente', 'reclutador')
+ *   // Ambos roles pueden crear ofertas
+ *   authorizeEmpresaRoles('admin_empresa', 'reclutador')
  */
 const authorizeEmpresaRoles = (...roles) => {
   return (req, res, next) => {
@@ -131,9 +129,6 @@ const authorizeEmpresaRoles = (...roles) => {
         code: 'SIN_ROL',
       });
     }
-
-    // El propietario siempre tiene acceso (no necesita estar en la lista explícita)
-    if (rolActual === 'propietario') return next();
 
     // Verifica si el rol del usuario está en la lista de roles permitidos
     if (!roles.includes(rolActual)) {
@@ -151,14 +146,14 @@ const authorizeEmpresaRoles = (...roles) => {
 
 /**
  * Helper exportado: verifica si un rol tiene al menos el nivel mínimo requerido.
- * Útil en controllers para checks programáticos sin middleware adicional.
+ * Con solo 2 roles: admin_empresa (índice 0) > reclutador (índice 1).
  *
- * @param {string} rolActual   - Rol del usuario (ej: 'reclutador')
- * @param {string} rolMinimo   - Rol mínimo requerido (ej: 'gerente')
+ * @param {string} rolActual   - Rol del usuario ('admin_empresa' | 'reclutador')
+ * @param {string} rolMinimo   - Rol mínimo requerido
  * @returns {boolean}
  *
  * @example
- *   if (!tieneRolMinimo(req.miembroEmpresa.rolInterno, 'gerente')) {
+ *   if (!tieneRolMinimo(req.miembroEmpresa.rolInterno, 'admin_empresa')) {
  *     return res.status(403).json({ ... });
  *   }
  */

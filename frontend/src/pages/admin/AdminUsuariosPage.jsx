@@ -26,10 +26,12 @@ const ROL_BADGE = {
 
 /* Etiquetas para rolInterno dentro de empresa_usuarios */
 const ROL_INTERNO_LABEL = {
-  propietario: 'Propietario',
-  gerente:     'Gerente',
-  reclutador:  'Reclutador',
-  viewer:      'Viewer',
+  admin_empresa: 'Administrador de empresa',
+  reclutador:    'Reclutador',
+  // Valores legacy — ya no se asignan pero pueden aparecer en datos históricos
+  propietario: 'Propietario (legacy)',
+  gerente:     'Gerente (legacy)',
+  viewer:      'Solo lectura (legacy)',
 };
 
 /**

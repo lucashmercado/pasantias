@@ -110,13 +110,13 @@ exports.register = async (req, res) => {
       // Perfil de empresa en estado pendiente hasta aprobación del admin
       const empresa = await Empresa.create({ usuarioId: nuevoUsuario.id, razonSocial: razonSocial || '' });
 
-      // Registra automáticamente al creador como propietario del equipo.
-      // Este registro es la base del sistema multi-usuario: sin él el propietario
+      // Registra automáticamente al creador como admin_empresa del equipo.
+      // Este registro es la base del sistema multi-usuario: sin él el admin
       // no aparecería en /api/empresas/equipo junto al resto de los miembros.
       await EmpresaUsuario.create({
         empresaId: empresa.id,
         usuarioId: nuevoUsuario.id,
-        rolInterno: 'propietario',
+        rolInterno: 'admin_empresa',
         activo: true,
       });
     }

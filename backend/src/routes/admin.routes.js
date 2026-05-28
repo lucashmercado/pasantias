@@ -566,7 +566,7 @@ router.get('/solicitudes-empresa', ...soloAdmin, async (req, res) => {
  *  2. Genera credenciales automáticas para el usuario reclutador
  *  3. Crea el Usuario con rol 'empresa'
  *  4. Crea la Empresa vinculada al usuario
- *  5. Registra al usuario como 'propietario' del equipo (EmpresaUsuario)
+ *  5. Registra al usuario como 'admin_empresa' del equipo (EmpresaUsuario)
  *  6. Envía las credenciales por email al solicitante
  */
 router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, async (req, res) => {
@@ -627,11 +627,11 @@ router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, async (req, res) 
       estadoAprobacion: 'aprobada',
     }, { transaction: t });
 
-    // ── 5. Registrar al usuario como propietario del equipo ───────────────────
+    // ── 5. Registrar al usuario como admin_empresa del equipo ────────────────
     await EmpresaUsuario.create({
       empresaId:  nuevaEmpresa.id,
       usuarioId:  nuevoUsuario.id,
-      rolInterno: 'propietario',
+      rolInterno: 'admin_empresa',
       activo:     true,
     }, { transaction: t });
 

@@ -13,15 +13,16 @@
  * ┌─────────────────────────────────────────────────────────────────────────────┐
  * │  Permisos por rol en el equipo                                             │
  * │                                                                             │
- * │  Acción                 │ propietario │ gerente │ reclutador │ viewer      │
+ * │  Acción                    │ admin_empresa │ reclutador │                    │
  * │  ─────────────────────────────────────────────────────────────────────    │
- * │  Ver dashboard          │     ✅       │   ✅    │    ✅      │   ✅       │
- * │  Ver mis ofertas        │     ✅       │   ✅    │    ✅      │   ✅       │
- * │  Ver equipo             │     ✅       │   ✅    │    ✅      │   ✅       │
- * │  Editar perfil empresa  │     ✅       │   ✅    │    ❌      │   ❌       │
- * │  Invitar miembro        │     ✅       │   ❌    │    ❌      │   ❌       │
- * │  Editar miembro         │     ✅       │   ❌    │    ❌      │   ❌       │
- * │  Eliminar miembro       │     ✅       │   ❌    │    ❌      │   ❌       │
+ * │  Ver dashboard             │      ✅       │     ✅     │                    │
+ * │  Ver mis ofertas           │      ✅       │     ✅     │                    │
+ * │  Ver equipo                │      ✅       │     ✅     │                    │
+ * │  Editar perfil empresa     │      ✅       │     ❌     │                    │
+ * │  Solicitar reclutador      │      ✅       │     ❌     │                    │
+ * │  Ver solicitudes equipo    │      ✅       │     ❌     │                    │
+ * │  Editar/suspender miembro  │      ✅       │     ❌     │                    │
+ * │  Reset password miembro    │      ✅       │     ❌     │                    │
  * └─────────────────────────────────────────────────────────────────────────────┘
  *
  * Rutas disponibles:
@@ -31,21 +32,20 @@
  * - GET  /mis-ofertas            → Lista de ofertas propias (todos los roles)
  *
  * Perfil de empresa:
- * - GET  /mi-empresa             → Ver perfil (todos los roles)
- * - PUT  /mi-empresa             → Actualizar perfil (propietario, gerente)
+ * - GET  /mi-empresa             → Ver perfil (todos los miembros)
+ * - PUT  /mi-empresa             → Actualizar perfil (solo admin_empresa)
  *
  * Equipo de reclutadores:
- * - GET  /equipo                 → Listar miembros (todos los roles)
- * - POST /equipo                 → Invitar miembro (solo propietario)
- * - PATCH /equipo/:id            → Editar miembro (solo propietario)
- * - DELETE /equipo/:id           → Dar de baja miembro (solo propietario)
+ * - GET  /equipo                 → Listar miembros (todos los miembros)
+ * - GET  /equipo/solicitudes     → Ver solicitudes (solo admin_empresa)
+ * - POST /equipo/solicitar       → Solicitar reclutador (solo admin_empresa)
+ * - PATCH /equipo/:id            → Editar miembro (solo admin_empresa)
+ * - DELETE /equipo/:id           → Dar de baja miembro (solo admin_empresa)
  *
  * Changelog:
  * - v1.0: implementación inicial
  * - v1.5: integración de verifyEmpresaMember y authorizeEmpresaRoles
- *         · Rutas de solo-lectura: cualquier miembro del equipo
- *         · Editar perfil: propietario o gerente
- *         · Gestión de equipo: solo propietario
+ * - v2.0: simplificación a admin_empresa/reclutador — migración 010
  */
 
 'use strict';
@@ -57,8 +57,9 @@ const ctrl = require('../controllers/empresa.controller');
 
 // Shorthand: token JWT + resolver empresa + rol en equipo
 const miembro    = [verifyToken, verifyEmpresaMember];
-const soloOwner  = [...miembro, authorizeEmpresaRoles('propietario')];
-const ownerOGte  = [...miembro, authorizeEmpresaRoles('propietario', 'gerente')];
+// soloAdmin: solo admin_empresa puede gestionar equipo y editar perfil
+const soloAdmin  = [...miembro, authorizeEmpresaRoles('admin_empresa')];
+// ownerOGte eliminado: no existe gerente; soloAdmin reemplaza ambos
 
 // Compatibilidad: rutas donde solo el rol sistema 'empresa' puede acceder
 // (se mantiene para no romper integraciones externas existentes)
@@ -77,32 +78,32 @@ router.get('/mis-ofertas', ...miembro, ctrl.getMisOfertas);
 // GET /api/empresas/mi-empresa — Datos de la empresa (todos los miembros)
 router.get('/mi-empresa', ...miembro, ctrl.getMiEmpresa);
 
-// PUT /api/empresas/mi-empresa — Actualiza perfil (propietario o gerente)
-router.put('/mi-empresa', ...ownerOGte, ctrl.updateMiEmpresa);
+// PUT /api/empresas/mi-empresa — Actualiza perfil (solo admin_empresa)
+router.put('/mi-empresa', ...soloAdmin, ctrl.updateMiEmpresa);
 
 // ── Equipo de reclutadores ────────────────────────────────────────────────────
 
-// GET /api/empresas/equipo — Lista todos los miembros del equipo (todos los roles)
+// GET /api/empresas/equipo — Lista todos los miembros del equipo (todos los miembros)
 router.get('/equipo', ...miembro, ctrl.getEquipo);
 
-// GET /api/empresas/equipo/solicitudes — Lista solicitudes de reclutadores de esta empresa (propietario/gerente)
+// GET /api/empresas/equipo/solicitudes — Lista solicitudes de reclutadores (solo admin_empresa)
 // ⚠️ DEBE ir ANTES de /equipo/:id
-router.get('/equipo/solicitudes', ...ownerOGte, ctrl.getMisSolicitudesReclutador);
+router.get('/equipo/solicitudes', ...soloAdmin, ctrl.getMisSolicitudesReclutador);
 
-// POST /api/empresas/equipo/solicitar — Envia solicitud de alta de reclutador al admin (solo propietario)
+// POST /api/empresas/equipo/solicitar — Envía solicitud de alta al admin (solo admin_empresa)
 // El admin es quien crea el usuario al aprobar. La empresa NO crea usuarios directamente.
-router.post('/equipo/solicitar', ...soloOwner, ctrl.solicitarReclutador);
+router.post('/equipo/solicitar', ...soloAdmin, ctrl.solicitarReclutador);
 
-// PATCH /api/empresas/equipo/:id/password — Resetea la contraseña de un miembro (solo propietario)
+// PATCH /api/empresas/equipo/:id/password — Resetea la contraseña de un miembro (solo admin_empresa)
 // ⚠️ DEBE ir ANTES de /equipo/:id para que Express no interprete 'password' como un id
 // Body: { password }
-router.patch('/equipo/:id/password', ...soloOwner, ctrl.resetPasswordMiembro);
+router.patch('/equipo/:id/password', ...soloAdmin, ctrl.resetPasswordMiembro);
 
-// PATCH /api/empresas/equipo/:id — Actualiza rol o estado de un miembro (solo propietario)
+// PATCH /api/empresas/equipo/:id — Actualiza rol o estado de un miembro (solo admin_empresa)
 // Body: { rolInterno?, activo? }
-router.patch('/equipo/:id', ...soloOwner, ctrl.updateMiembro);
+router.patch('/equipo/:id', ...soloAdmin, ctrl.updateMiembro);
 
-// DELETE /api/empresas/equipo/:id — Da de baja un miembro (solo propietario)
-router.delete('/equipo/:id', ...soloOwner, ctrl.removeMiembro);
+// DELETE /api/empresas/equipo/:id — Da de baja un miembro (solo admin_empresa)
+router.delete('/equipo/:id', ...soloAdmin, ctrl.removeMiembro);
 
 module.exports = router;

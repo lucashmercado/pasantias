@@ -2,23 +2,20 @@
  * empresaUsuario.model.js — Modelo Sequelize para la tabla "empresa_usuarios".
  *
  * Tabla de unión que permite que una empresa tenga múltiples usuarios con
- * distintos niveles de acceso gestionados por la cuenta propietaria.
+ * distintos niveles de acceso.
  *
  * Casos de uso:
- * - Una empresa registra reclutadores adicionales para gestionar postulaciones
- * - El gerente puede ver qué reclutador asignó cada candidato
- * - Los reclutadores pueden crear ofertas y gestionar candidatos
- * - Los viewers pueden consultar información sin poder modificarla
+ * - El administrador de empresa gestiona el equipo y el perfil
+ * - Los reclutadores crean ofertas y gestionan postulantes
  *
  * Roles internos:
- *   propietario → el usuario que registró la empresa (se crea automáticamente al registrar)
- *   gerente     → puede gestionar reclutadores y ver todas las ofertas
- *   reclutador  → puede crear ofertas y gestionar postulantes
- *   viewer      → solo lectura (ve dashboard, ofertas y postulaciones; no puede modificar)
+ *   admin_empresa → administrador: puede editar empresa, solicitar reclutadores, ver equipo
+ *   reclutador    → puede crear ofertas y gestionar candidatos; no puede gestionar equipo
  *
  * Changelog:
  * - v1.2: creación inicial con roles propietario/gerente/reclutador
  * - v1.5: agregado rol 'viewer' (solo lectura) — migración 009
+ * - v2.0: simplificación a admin_empresa/reclutador — migración 010
  */
 
 'use strict';
@@ -44,9 +41,10 @@ module.exports = (sequelize) => {
     },
 
     // Rol que cumple este usuario dentro del equipo de la empresa
-    // Jerarquía: propietario > gerente > reclutador > viewer
+    // admin_empresa: acceso completo (editar empresa, gestionar equipo, ofertas, postulaciones)
+    // reclutador:    acceso operativo (ofertas, postulaciones, chat); sin gestión de equipo
     rolInterno: {
-      type: DataTypes.ENUM('propietario', 'gerente', 'reclutador', 'viewer'),
+      type: DataTypes.ENUM('admin_empresa', 'reclutador'),
       allowNull: false,
       defaultValue: 'reclutador',
     },
