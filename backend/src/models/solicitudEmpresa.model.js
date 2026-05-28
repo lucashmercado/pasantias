@@ -49,15 +49,52 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
 
-    // Email de contacto del solicitante / empresa
+    // Email institucional de contacto de la empresa (visible en el perfil)
+    // NO es el email de login — ese es responsableEmail
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
 
-    // Teléfono de contacto
+    // Sitio web de la empresa
+    sitioWeb: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+
+    // Teléfono de contacto institucional
     telefono: {
       type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+
+    // ── Datos del responsable / admin_empresa ─────────────────────────────────
+    // El responsable será el usuario administrador de la empresa.
+    // Sus credenciales de acceso se generan con responsableEmail como login.
+
+    responsableNombre: {
+      type: DataTypes.STRING(150),
+      allowNull: true, // nullable en DB para compatibilidad con registros anteriores
+    },
+
+    responsableApellido: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
+
+    // Email de acceso/login del usuario admin_empresa que se creará al aprobar
+    responsableEmail: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+
+    responsableTelefono: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+
+    responsableCargo: {
+      type: DataTypes.STRING(100),
       allowNull: true,
     },
 
@@ -88,7 +125,7 @@ module.exports = (sequelize) => {
     },
 
     // Reclutadores iniciales cargados en el formulario de registro
-    // Array de { nombre, email } — se crean como usuarios al aprobar la solicitud
+    // Array de { nombre, apellido, email } — se convierten en SolicitudReclutador al aprobar
     reclutadores: {
       type: DataTypes.JSON,
       allowNull: true,

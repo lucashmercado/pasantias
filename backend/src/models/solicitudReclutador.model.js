@@ -28,6 +28,12 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
 
+    // Nullable para compatibilidad con solicitudes anteriores a Etapa 3
+    apellido: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+    },
+
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,

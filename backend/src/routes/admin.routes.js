@@ -562,163 +562,173 @@ router.get('/solicitudes-empresa', ...soloAdmin, async (req, res) => {
  * PATCH /api/admin/solicitudes-empresa/:id/aprobar
  *
  * Cuando el administrador aprueba una solicitud:
- *  1. Cambia el estado de la solicitud a "aprobado"
- *  2. Genera credenciales automáticas para el usuario reclutador
- *  3. Crea el Usuario con rol 'empresa'
+ *  1. Pre-valida que el email de login (responsableEmail || email) no esté registrado
+ *  2. Genera credenciales automáticas para el usuario admin_empresa
+ *  3. Crea el Usuario con rol 'empresa' usando datos del responsable
  *  4. Crea la Empresa vinculada al usuario
  *  5. Registra al usuario como 'admin_empresa' del equipo (EmpresaUsuario)
- *  6. Envía las credenciales por email al solicitante
+ *  5b. Convierte reclutadores iniciales en SolicitudReclutador pendientes
+ *  6. Actualiza estado de la solicitud a "aprobado"
+ *  7. Envía credenciales por email al responsable
  */
 router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    // ── 1. Buscar y validar la solicitud ──────────────────────────────────────
-    const solicitud = await SolicitudEmpresa.findByPk(req.params.id, { transaction: t });
+    // ── 0. Buscar la solicitud (fuera de transacción para el pre-check) ────────
+    const solicitud = await SolicitudEmpresa.findByPk(req.params.id);
     if (!solicitud) {
-      await t.rollback();
       return res.status(404).json({ success: false, message: 'Solicitud no encontrada.' });
     }
     if (solicitud.estado !== 'pendiente') {
-      await t.rollback();
       return res.status(400).json({ success: false, message: `La solicitud ya fue ${solicitud.estado}.` });
     }
 
-    // ── 2. Generar credenciales ───────────────────────────────────────────────
-    // Contraseña aleatoria de 12 caracteres legibles
-    const passwordPlano = crypto.randomBytes(6).toString('hex'); // Ej: "a3f9b12c8e1d"
-    const hash = await bcrypt.hash(passwordPlano, 12);
-
-    // ── 3. Crear usuario con rol 'empresa' ────────────────────────────────────
-    // Primero verificamos que el email no esté ya registrado
-    const emailExistente = await Usuario.findOne({
-      where: { email: solicitud.email },
-      transaction: t,
-    });
+    // ── 1. Pre-validar email de login antes de abrir transacción ──────────────
+    // El email de login es responsableEmail si existe; si no (solicitudes antiguas), el email institucional
+    const loginEmail = solicitud.responsableEmail || solicitud.email;
+    const emailExistente = await Usuario.findOne({ where: { email: loginEmail } });
     if (emailExistente) {
-      await t.rollback();
       return res.status(400).json({
         success: false,
-        message: `Ya existe una cuenta con el email ${solicitud.email}. Verificá si la empresa ya fue aprobada anteriormente.`,
+        message: `Ya existe una cuenta registrada con el email ${loginEmail}. Usá otro email para el responsable o verificá si la empresa ya fue aprobada.`,
+        code: 'EMAIL_DUPLICADO',
       });
     }
 
-    const nuevoUsuario = await Usuario.create({
-      nombre:    solicitud.razonSocial,   // Nombre visible = razón social
-      apellido:  'Empresa',
-      email:     solicitud.email,
-      password:  hash,
-      rol:       'empresa',
-      telefono:  solicitud.telefono || null,
-      ubicacion: solicitud.ciudad   || null,
-      activo:    true,
-      habilitado: true,                  // Ya aprobada, puede iniciar sesión
-    }, { transaction: t });
-
-    // ── 4. Crear la Empresa ───────────────────────────────────────────────────
-    const nuevaEmpresa = await Empresa.create({
-      usuarioId:        nuevoUsuario.id,
-      razonSocial:      solicitud.razonSocial,
-      cuit:             solicitud.cuit,
-      rubro:            solicitud.rubro,
-      direccion:        solicitud.direccion || null,
-      ciudad:           solicitud.ciudad    || null,
-      telefono:         solicitud.telefono  || null,
-      descripcion:      solicitud.descripcion || null,
-      estadoAprobacion: 'aprobada',
-    }, { transaction: t });
-
-    // ── 5. Registrar al usuario como admin_empresa del equipo ────────────────
-    await EmpresaUsuario.create({
-      empresaId:  nuevaEmpresa.id,
-      usuarioId:  nuevoUsuario.id,
-      rolInterno: 'admin_empresa',
-      activo:     true,
-    }, { transaction: t });
-
-    // ── 5b. Crear solicitudes de reclutador para los reclutadores incluidos ───
-    // Si la empresa envió reclutadores en el formulario de registro,
-    // los convertimos en SolicitudReclutador pendientes para que el admin
-    // los apruebe/rechace individualmente en la sección de reclutadores.
-    const reclutadoresSolicitud = Array.isArray(solicitud.reclutadores)
-      ? solicitud.reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim())
-      : [];
-
-    if (reclutadoresSolicitud.length > 0) {
-      await SolicitudReclutador.bulkCreate(
-        reclutadoresSolicitud.map(r => ({
-          empresaId: nuevaEmpresa.id,
-          nombre:    r.nombre.trim(),
-          email:     r.email.trim().toLowerCase(),
-          estado:    'pendiente',
-        })),
-        { transaction: t }
-      );
-    }
-
-    // ── 6. Actualizar estado de la solicitud ──────────────────────────────────
-    await solicitud.update({ estado: 'aprobado' }, { transaction: t });
-
-    // ── Confirmar transacción ─────────────────────────────────────────────────
-    await t.commit();
-
-    // ── 7. Auditoría ──────────────────────────────────────────────────────────
-    await logAction({
-      usuarioId: req.usuario.id,
-      accion:    'aprobar_solicitud_empresa',
-      entidad:   'solicitud_empresa',
-      entidadId: solicitud.id,
-      detalle:   { razonSocial: solicitud.razonSocial, email: solicitud.email, empresaId: nuevaEmpresa.id },
-      ip:        req.ip,
-    });
-
-    // ── 8. Enviar email con credenciales ──────────────────────────────────────
+    // ── Abrir transacción ─────────────────────────────────────────────────────
+    const t = await sequelize.transaction();
     try {
-      const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
-      await enviarEmail({
-        to: solicitud.email,
-        subject: '✅ Tu solicitud fue aprobada – SisPasantías',
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-            <h2 style="color:#0073AD">¡Tu solicitud fue aprobada! 🎉</h2>
-            <p>Hola, <strong>${solicitud.razonSocial}</strong>.</p>
-            <p>El equipo de <strong>SisPasantías</strong> revisó tu solicitud y la <strong>aprobó</strong>.
-            Ya podés acceder al panel de empresa con las siguientes credenciales:</p>
-            <table style="margin:1rem 0;border-collapse:collapse;width:100%">
-              <tr>
-                <td style="padding:8px 12px;background:#f0f6fc;border-radius:6px 0 0 6px;font-weight:600;width:130px">Email</td>
-                <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0">${solicitud.email}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 12px;background:#f0f6fc;border-radius:6px 0 0 6px;font-weight:600;margin-top:4px">Contraseña</td>
-                <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0;font-family:monospace;font-size:1.1rem;letter-spacing:0.05em">${passwordPlano}</td>
-              </tr>
-            </table>
-            <p style="color:#c0392b;font-size:0.88rem">⚠️ Por seguridad, te recomendamos cambiar la contraseña al iniciar sesión por primera vez.</p>
-            <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
-              Ingresar al sistema
-            </a>
-            <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
-          </div>
-        `,
-      });
-    } catch (emailErr) {
-      // El email falla de forma silenciosa: la transacción ya se confirmó
-      console.error('[Admin] Error enviando email de aprobación:', emailErr.message);
-    }
+      // ── 2. Generar credenciales ─────────────────────────────────────────────
+      const passwordPlano = crypto.randomBytes(6).toString('hex');
+      const hash = await bcrypt.hash(passwordPlano, 12);
 
-    return res.json({
-      success: true,
-      message: `Solicitud aprobada. Empresa y usuario creados. Credenciales enviadas a ${solicitud.email}.`,
-      data: {
+      // ── 3. Crear usuario admin_empresa con datos del responsable ────────────
+      // Fallbacks para solicitudes anteriores a Etapa 3 que no tienen responsable separado
+      const nuevoUsuario = await Usuario.create({
+        nombre:    solicitud.responsableNombre   || solicitud.razonSocial,
+        apellido:  solicitud.responsableApellido || 'Empresa',
+        email:     loginEmail,
+        password:  hash,
+        rol:       'empresa',
+        telefono:  solicitud.responsableTelefono || solicitud.telefono || null,
+        ubicacion: solicitud.ciudad || null,
+        activo:    true,
+        habilitado: true,
+      }, { transaction: t });
+
+      // ── 4. Crear la Empresa ─────────────────────────────────────────────────
+      const nuevaEmpresa = await Empresa.create({
+        usuarioId:        nuevoUsuario.id,
+        razonSocial:      solicitud.razonSocial,
+        cuit:             solicitud.cuit,
+        rubro:            solicitud.rubro,
+        sitioWeb:         solicitud.sitioWeb   || null,
+        direccion:        solicitud.direccion  || null,
+        ciudad:           solicitud.ciudad     || null,
+        telefono:         solicitud.telefono   || null,
+        descripcion:      solicitud.descripcion || null,
+        estadoAprobacion: 'aprobada',
+      }, { transaction: t });
+
+      // ── 5. Registrar al usuario como admin_empresa del equipo ───────────────
+      await EmpresaUsuario.create({
         empresaId:  nuevaEmpresa.id,
         usuarioId:  nuevoUsuario.id,
-        email:      solicitud.email,
-        // Solo en desarrollo devolvemos la contraseña en el body para facilitar pruebas
-        ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: passwordPlano }),
-      },
-    });
+        rolInterno: 'admin_empresa',
+        activo:     true,
+      }, { transaction: t });
+
+      // ── 5b. Convertir reclutadores iniciales en SolicitudReclutador ─────────
+      // Se crean como pendientes para que el admin las apruebe individualmente
+      const reclutadoresSolicitud = Array.isArray(solicitud.reclutadores)
+        ? solicitud.reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim())
+        : [];
+
+      if (reclutadoresSolicitud.length > 0) {
+        await SolicitudReclutador.bulkCreate(
+          reclutadoresSolicitud.map(r => ({
+            empresaId: nuevaEmpresa.id,
+            nombre:    r.nombre.trim(),
+            apellido:  r.apellido?.trim() || null,
+            email:     r.email.trim().toLowerCase(),
+            estado:    'pendiente',
+          })),
+          { transaction: t }
+        );
+      }
+
+      // ── 6. Actualizar estado de la solicitud ────────────────────────────────
+      await solicitud.update({ estado: 'aprobado' }, { transaction: t });
+
+      await t.commit();
+
+      // ── 7. Auditoría ────────────────────────────────────────────────────────
+      await logAction({
+        usuarioId: req.usuario.id,
+        accion:    'aprobar_solicitud_empresa',
+        entidad:   'solicitud_empresa',
+        entidadId: solicitud.id,
+        detalle:   {
+          razonSocial: solicitud.razonSocial,
+          emailLogin:  loginEmail,
+          empresaId:   nuevaEmpresa.id,
+          reclutadoresCreados: reclutadoresSolicitud.length,
+        },
+        ip: req.ip,
+      });
+
+      // ── 8. Enviar email con credenciales al responsable ─────────────────────
+      try {
+        const nombreResponsable = solicitud.responsableNombre || solicitud.razonSocial;
+        const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
+        await enviarEmail({
+          to: loginEmail,
+          subject: '✅ Tu solicitud fue aprobada – SisPasantías',
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
+              <h2 style="color:#0073AD">¡Tu solicitud fue aprobada! 🎉</h2>
+              <p>Hola, <strong>${nombreResponsable}</strong>.</p>
+              <p>El equipo de <strong>SisPasantías</strong> aprobó la solicitud de
+              <strong>${solicitud.razonSocial}</strong>. Ya podés acceder al panel
+              de empresa con las siguientes credenciales:</p>
+              <table style="margin:1rem 0;border-collapse:collapse;width:100%">
+                <tr>
+                  <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px;border-radius:6px 0 0 6px">Email</td>
+                  <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0">${loginEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;margin-top:4px;border-radius:6px 0 0 6px">Contraseña</td>
+                  <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0;font-family:monospace;font-size:1.1rem;letter-spacing:0.05em">${passwordPlano}</td>
+                </tr>
+              </table>
+              <p style="color:#c0392b;font-size:0.88rem">⚠️ Por seguridad, te recomendamos cambiar la contraseña al iniciar sesión por primera vez.</p>
+              <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
+                Ingresar al sistema
+              </a>
+              ${reclutadoresSolicitud.length > 0 ? `<p style="margin-top:1.5rem;font-size:0.88rem;color:#444">Se crearon ${reclutadoresSolicitud.length} solicitud(es) de reclutador pendientes de aprobación.</p>` : ''}
+              <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        console.error('[Admin] Error enviando email de aprobación:', emailErr.message);
+      }
+
+      return res.json({
+        success: true,
+        message: `Solicitud aprobada. Empresa "${solicitud.razonSocial}" y usuario creados. Credenciales enviadas a ${loginEmail}.`,
+        data: {
+          empresaId: nuevaEmpresa.id,
+          usuarioId: nuevoUsuario.id,
+          email:     loginEmail,
+          reclutadoresPendientes: reclutadoresSolicitud.length,
+          ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: passwordPlano }),
+        },
+      });
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   } catch (err) {
-    await t.rollback();
     console.error('[Admin] Error al aprobar solicitud:', err);
     return res.status(500).json({ success: false, message: 'Error al aprobar la solicitud.' });
   }
@@ -827,18 +837,22 @@ router.patch('/solicitudes-reclutador/:id/aprobar', ...soloAdmin, async (req, re
     const emailExistente = await Usuario.findOne({ where: { email: solicitud.email }, transaction: t });
     if (emailExistente) {
       await t.rollback();
-      return res.status(400).json({ success: false, message: `Ya existe un usuario con el email ${solicitud.email}.` });
+      return res.status(400).json({
+        success: false,
+        message: `El email ${solicitud.email} ya tiene una cuenta registrada en el sistema. Verificá si el reclutador ya fue aprobado anteriormente.`,
+        code: 'EMAIL_DUPLICADO',
+      });
     }
 
     // Generar credenciales
     const passwordPlano = crypto.randomBytes(6).toString('hex');
     const hash = await bcrypt.hash(passwordPlano, 12);
 
-    // Crear usuario con rol empresa
+    // Crear usuario con rol empresa usando datos reales del reclutador
     const nuevoUsuario = await Usuario.create({
-      nombre: solicitud.nombre,
-      apellido: 'Reclutador',
-      email: solicitud.email,
+      nombre:   solicitud.nombre,
+      apellido: solicitud.apellido?.trim() || 'S/D',
+      email:    solicitud.email,
       password: hash,
       rol: 'empresa',
       activo: true,

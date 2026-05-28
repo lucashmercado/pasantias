@@ -572,49 +572,61 @@ exports.removeMiembro = async (req, res) => {
  * La empresa solicita el alta de un nuevo reclutador.
  * NO crea el usuario — envía una SolicitudReclutador al admin para su aprobación.
  *
- * Body: { nombre, email }
+ * Body: { nombre, apellido, email }
  */
 exports.solicitarReclutador = async (req, res) => {
   try {
-    const { nombre, email } = req.body;
+    const { nombre, apellido, email } = req.body;
 
-    if (!nombre || !email) {
-      return res.status(400).json({ success: false, message: 'Nombre y email son requeridos.' });
+    if (!nombre?.trim() || !apellido?.trim() || !email?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre, apellido y email son requeridos.',
+      });
     }
 
     const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-    // Verificar que no exista ya una solicitud pendiente con ese email para esta empresa
-    const yaExiste = await SolicitudReclutador.findOne({
-      where: { empresaId: empresa.id, email, estado: 'pendiente' },
-    });
-    if (yaExiste) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya hay una solicitud pendiente para ese email en tu empresa.',
-      });
-    }
-
-    // Verificar que ese email no sea ya miembro activo del equipo
-    const usuarioExistente = await Usuario.findOne({ where: { email } });
-    if (usuarioExistente) {
+    // Verificar que el email no pertenezca a ningún usuario registrado en el sistema
+    const usuarioRegistrado = await Usuario.findOne({ where: { email: email.trim() } });
+    if (usuarioRegistrado) {
+      // Diferenciar: si ya es miembro del equipo o si es un usuario de otro tipo
       const esMiembro = await EmpresaUsuario.findOne({
-        where: { empresaId: empresa.id, usuarioId: usuarioExistente.id, activo: true },
+        where: { empresaId: empresa.id, usuarioId: usuarioRegistrado.id, activo: true },
       });
       if (esMiembro) {
         return res.status(400).json({
           success: false,
           message: 'Ese email ya corresponde a un miembro activo del equipo.',
+          code: 'YA_ES_MIEMBRO',
         });
       }
+      return res.status(400).json({
+        success: false,
+        message: 'Ese email ya tiene una cuenta registrada en el sistema. Contactate con el administrador si necesitás vincularlo a tu empresa.',
+        code: 'EMAIL_REGISTRADO',
+      });
+    }
+
+    // Verificar que no exista ya una solicitud pendiente con ese email para esta empresa
+    const solicitudPendiente = await SolicitudReclutador.findOne({
+      where: { empresaId: empresa.id, email: email.trim().toLowerCase(), estado: 'pendiente' },
+    });
+    if (solicitudPendiente) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya hay una solicitud pendiente para ese email en tu empresa.',
+        code: 'EMAIL_SOLICITUD_PENDIENTE',
+      });
     }
 
     const solicitud = await SolicitudReclutador.create({
       empresaId: empresa.id,
-      nombre,
-      email,
-      estado: 'pendiente',
+      nombre:    nombre.trim(),
+      apellido:  apellido.trim(),
+      email:     email.trim().toLowerCase(),
+      estado:    'pendiente',
     });
 
     return res.status(201).json({

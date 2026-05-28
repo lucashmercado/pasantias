@@ -110,21 +110,21 @@ export default function AdminSolicitudesPage() {
 
   // ── Aprobar solicitud ───────────────────────────────────────────────────────
   const handleAprobar = async (solicitud) => {
-    // Si no estamos en modo confirmación, mostramos el estado de confirmación inline
     if (confirmando !== solicitud.id) {
       setConfirmando(solicitud.id);
       return;
     }
-    // Segunda pulsación: ejecutar la acción
     setConfirmando(null);
     setAccionando(true);
     setError('');
     try {
       const res = await adminService.aprobarSolicitud(solicitud.id);
       const { data } = res.data;
+      const emailDestino = solicitud.responsableEmail || solicitud.email;
       showSuccess(
-        `✅ "${solicitud.razonSocial}" aprobada. Credenciales enviadas a ${solicitud.email}` +
-        (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '')
+        `✅ "${solicitud.razonSocial}" aprobada. Credenciales enviadas a ${emailDestino}` +
+        (data?.passwordGenerada ? ` (pwd dev: ${data.passwordGenerada})` : '') +
+        (data?.reclutadoresPendientes ? ` · ${data.reclutadoresPendientes} solicitud(es) de reclutador creadas.` : '')
       );
       setDetalle(null);
       cargar();
@@ -413,15 +413,50 @@ export default function AdminSolicitudesPage() {
                 <dt>Rubro</dt><dd>{detalle.rubro || '—'}</dd>
                 <dt>Ciudad</dt><dd>{detalle.ciudad || '—'}</dd>
                 <dt>Dirección</dt><dd>{detalle.direccion || '—'}</dd>
+                <dt>Teléfono</dt><dd>{detalle.telefono || '—'}</dd>
+                <dt>Email contacto</dt>
+                <dd><a href={`mailto:${detalle.email}`}>{detalle.email}</a></dd>
+                {detalle.sitioWeb && (
+                  <>
+                    <dt>Sitio web</dt>
+                    <dd>
+                      <a href={detalle.sitioWeb} target="_blank" rel="noopener noreferrer">
+                        {detalle.sitioWeb}
+                      </a>
+                    </dd>
+                  </>
+                )}
               </dl>
             </div>
 
+            {/* Datos del responsable */}
             <div className={styles.detalleSection}>
-              <h4 className={styles.detalleSectionTitle}>Contacto</h4>
-              <dl className={styles.detalleDL}>
-                <dt>Email</dt><dd><a href={`mailto:${detalle.email}`}>{detalle.email}</a></dd>
-                <dt>Teléfono</dt><dd>{detalle.telefono || '—'}</dd>
-              </dl>
+              <h4 className={styles.detalleSectionTitle}>👤 Responsable / Administrador</h4>
+              {(detalle.responsableNombre || detalle.responsableEmail) ? (
+                <dl className={styles.detalleDL}>
+                  <dt>Nombre</dt>
+                  <dd>
+                    {[detalle.responsableNombre, detalle.responsableApellido].filter(Boolean).join(' ') || '—'}
+                  </dd>
+                  <dt>Email de acceso</dt>
+                  <dd>
+                    <a href={`mailto:${detalle.responsableEmail}`}>{detalle.responsableEmail}</a>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '0.5rem' }}>
+                      (recibirá las credenciales)
+                    </span>
+                  </dd>
+                  {detalle.responsableCargo && (
+                    <><dt>Cargo</dt><dd>{detalle.responsableCargo}</dd></>
+                  )}
+                  {detalle.responsableTelefono && (
+                    <><dt>Teléfono</dt><dd>{detalle.responsableTelefono}</dd></>
+                  )}
+                </dl>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic' }}>
+                  Sin datos de responsable (solicitud anterior). Las credenciales se enviarán a {detalle.email}.
+                </p>
+              )}
             </div>
 
             {detalle.descripcion && (
@@ -473,7 +508,9 @@ export default function AdminSolicitudesPage() {
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     {recls.map((r, i) => (
                       <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem', background: '#f0f6fc', borderRadius: '6px', padding: '6px 10px' }}>
-                        <span style={{ fontWeight: 600 }}>{r.nombre}</span>
+                        <span style={{ fontWeight: 600 }}>
+                          {[r.nombre, r.apellido].filter(Boolean).join(' ')}
+                        </span>
                         <span style={{ color: '#64748b' }}>·</span>
                         <a href={`mailto:${r.email}`} style={{ color: '#0073AD' }}>{r.email}</a>
                       </li>
@@ -518,7 +555,8 @@ export default function AdminSolicitudesPage() {
             </div>
             <p className={styles.modalBody}>
               Vas a rechazar la solicitud de <strong>{detalle.razonSocial}</strong>.
-              Se enviará un email de notificación a <strong>{detalle.email}</strong>.
+              Se enviará un email de notificación a{' '}
+              <strong>{detalle.responsableEmail || detalle.email}</strong>.
             </p>
             <div className="form-group">
               <label htmlFor="motivo-rechazo">
@@ -625,7 +663,9 @@ export default function AdminSolicitudesPage() {
                           <strong>{s.empresa?.razonSocial ?? `Empresa #${s.empresaId}`}</strong>
                         </div>
                       </td>
-                      <td><strong>{s.nombre}</strong></td>
+                      <td>
+                        <strong>{[s.nombre, s.apellido].filter(Boolean).join(' ')}</strong>
+                      </td>
                       <td className={styles.emailCell}>{s.email}</td>
                       <td><EstadoBadge estado={s.estado} /></td>
                       <td className={styles.fechaCell}>{formatFecha(s.createdAt)}</td>

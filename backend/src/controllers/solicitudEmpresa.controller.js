@@ -8,61 +8,143 @@
 'use strict';
 const { SolicitudEmpresa } = require('../models');
 
+// Validación mínima de formato de email
+function esEmailValido(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 /**
  * crearSolicitud — Registra una nueva solicitud de empresa.
  *
- * Recibe los datos del formulario de pre-registro, los valida mínimamente
- * y los persiste en la tabla solicitudes_empresa con estado = "pendiente".
- * No crea usuario ni empresa.
+ * Campos requeridos:
+ *   Empresa:     razonSocial, cuit, rubro, email (institucional)
+ *   Responsable: responsableNombre, responsableApellido, responsableEmail
+ *
+ * Campos opcionales:
+ *   Empresa:     sitioWeb, direccion, ciudad, telefono
+ *   Responsable: responsableTelefono, responsableCargo
+ *   Contenido:   carrerasInteres, descripcion, puestos
+ *   Reclutadores iniciales: [{ nombre, apellido, email }]
  */
 async function crearSolicitud(req, res) {
   try {
     const {
+      // Empresa
       razonSocial,
       cuit,
       rubro,
+      sitioWeb,
       direccion,
       ciudad,
       email,
       telefono,
+      // Responsable
+      responsableNombre,
+      responsableApellido,
+      responsableEmail,
+      responsableTelefono,
+      responsableCargo,
+      // Contenido
       carrerasInteres,
       descripcion,
       puestos,
-      reclutadores,  // Array de { nombre, email } opcionales
+      // Reclutadores iniciales
+      reclutadores,
     } = req.body;
 
     // ── Validación de campos obligatorios ──────────────────────────────────────
-    if (!razonSocial || !cuit || !rubro || !email) {
+    const faltantes = [];
+    if (!razonSocial?.trim())        faltantes.push('Razón Social');
+    if (!cuit?.trim())               faltantes.push('CUIT');
+    if (!rubro?.trim())              faltantes.push('Rubro');
+    if (!email?.trim())              faltantes.push('Email de contacto institucional');
+    if (!responsableNombre?.trim())  faltantes.push('Nombre del responsable');
+    if (!responsableApellido?.trim()) faltantes.push('Apellido del responsable');
+    if (!responsableEmail?.trim())   faltantes.push('Email del responsable');
+
+    if (faltantes.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Los campos razonSocial, cuit, rubro y email son obligatorios.',
+        message: `Faltan campos obligatorios: ${faltantes.join(', ')}.`,
       });
     }
 
-    // Normalizar reclutadores: filtrar los que tengan nombre y email completos
-    const reclutadoresLimpios = Array.isArray(reclutadores)
-      ? reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim()).map(r => ({
-          nombre: r.nombre.trim(),
-          email:  r.email.trim().toLowerCase(),
-        }))
-      : [];
+    // ── Validación de formato de emails ────────────────────────────────────────
+    if (!esEmailValido(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'El email de contacto institucional no tiene un formato válido.',
+      });
+    }
+
+    if (!esEmailValido(responsableEmail.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'El email del responsable no tiene un formato válido.',
+      });
+    }
+
+    // ── Normalizar reclutadores ────────────────────────────────────────────────
+    // Se requiere nombre, apellido y email si se agrega un reclutador
+    const reclutadoresLimpios = [];
+    const reclsRaw = Array.isArray(reclutadores) ? reclutadores : [];
+
+    for (let i = 0; i < reclsRaw.length; i++) {
+      const r = reclsRaw[i];
+      const nombre   = r?.nombre?.trim()   || '';
+      const apellido = r?.apellido?.trim() || '';
+      const rEmail   = r?.email?.trim()    || '';
+
+      // Ignorar filas completamente vacías
+      if (!nombre && !apellido && !rEmail) continue;
+
+      // Si tiene algún campo, exigir los 3
+      if (!nombre || !apellido || !rEmail) {
+        return res.status(400).json({
+          success: false,
+          message: `El reclutador #${i + 1} requiere nombre, apellido y email completos.`,
+        });
+      }
+
+      if (!esEmailValido(rEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: `El email del reclutador #${i + 1} (${rEmail}) no tiene un formato válido.`,
+        });
+      }
+
+      reclutadoresLimpios.push({
+        nombre,
+        apellido,
+        email: rEmail.toLowerCase(),
+      });
+    }
 
     // ── Persistencia ───────────────────────────────────────────────────────────
     const solicitud = await SolicitudEmpresa.create({
-      razonSocial: razonSocial.trim(),
-      cuit: cuit.trim(),
-      rubro: rubro.trim(),
-      direccion: direccion?.trim() || null,
-      ciudad: ciudad?.trim() || null,
-      email: email.trim().toLowerCase(),
-      telefono: telefono?.trim() || null,
-      // carrerasInteres puede llegar como array o como string JSON
+      // Empresa
+      razonSocial:   razonSocial.trim(),
+      cuit:          cuit.trim(),
+      rubro:         rubro.trim(),
+      sitioWeb:      sitioWeb?.trim()      || null,
+      direccion:     direccion?.trim()     || null,
+      ciudad:        ciudad?.trim()        || null,
+      email:         email.trim().toLowerCase(),
+      telefono:      telefono?.trim()      || null,
+      // Responsable
+      responsableNombre:   responsableNombre.trim(),
+      responsableApellido: responsableApellido.trim(),
+      responsableEmail:    responsableEmail.trim().toLowerCase(),
+      responsableTelefono: responsableTelefono?.trim() || null,
+      responsableCargo:    responsableCargo?.trim()    || null,
+      // Contenido
       carrerasInteres: Array.isArray(carrerasInteres)
         ? carrerasInteres
         : (carrerasInteres ? JSON.parse(carrerasInteres) : []),
       descripcion: descripcion?.trim() || null,
-      puestos: puestos?.trim() || null,
-      reclutadores: reclutadoresLimpios,  // Guardamos los reclutadores opcionales
+      puestos:     puestos?.trim()     || null,
+      // Reclutadores
+      reclutadores: reclutadoresLimpios,
       estado: 'pendiente',
     });
 
@@ -70,8 +152,8 @@ async function crearSolicitud(req, res) {
       success: true,
       message: 'Tu solicitud fue enviada. Será evaluada por el instituto.',
       data: {
-        id: solicitud.id,
-        estado: solicitud.estado,
+        id:        solicitud.id,
+        estado:    solicitud.estado,
         createdAt: solicitud.createdAt,
       },
     });
