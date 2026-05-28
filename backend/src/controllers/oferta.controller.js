@@ -20,6 +20,61 @@
 const { Oferta, Empresa, Usuario, Perfil, Postulacion } = require('../models');
 const { Op } = require('sequelize');
 
+const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
+const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
+
+/**
+ * Valida y normaliza los campos de tipo puesto/experiencia de una oferta.
+ * Retorna { error, campos } donde campos son los valores normalizados a persistir.
+ */
+function validarCamposPuesto(body) {
+  const { tipoPuesto, requiereExperiencia, experienciaDetalle, carrerasDestinatarias } = body;
+
+  if (tipoPuesto !== undefined && tipoPuesto !== null && tipoPuesto !== '') {
+    if (!TIPOS_PUESTO_VALIDOS.includes(tipoPuesto)) {
+      return { error: `tipoPuesto inválido. Valores permitidos: ${TIPOS_PUESTO_VALIDOS.join(', ')}.` };
+    }
+  }
+
+  // Derivar nivelExperiencia legacy desde tipoPuesto (para mantener filtros existentes)
+  let nivelExperienciaLegacy;
+  if (tipoPuesto === 'junior') {
+    nivelExperienciaLegacy = 'junior';
+  } else if (tipoPuesto === 'pasante' || tipoPuesto === 'trainee') {
+    nivelExperienciaLegacy = 'sin_experiencia';
+  }
+
+  // Si el puesto es pasante, forzar requiereExperiencia a false
+  let requiereExp = requiereExperiencia;
+  if (tipoPuesto === 'pasante') requiereExp = false;
+
+  // Si no requiere experiencia, no guardar detalle
+  const detalle = requiereExp ? (experienciaDetalle || null) : null;
+
+  // Validar carreras destinatarias
+  const carreras = Array.isArray(carrerasDestinatarias)
+    ? carrerasDestinatarias.filter(c => typeof c === 'string' && c.trim())
+    : [];
+
+  if (carreras.length > 0) {
+    const invalidas = carreras.filter(c => !CARRERAS_VALIDAS.includes(c));
+    if (invalidas.length > 0) {
+      return { error: `Carreras destinatarias inválidas: ${invalidas.join(', ')}.` };
+    }
+  }
+
+  return {
+    error: null,
+    campos: {
+      ...(tipoPuesto !== undefined && { tipoPuesto: tipoPuesto || null }),
+      ...(requiereExp !== undefined && { requiereExperiencia: requiereExp }),
+      ...(detalle !== undefined && { experienciaDetalle: detalle }),
+      ...(carrerasDestinatarias !== undefined && { carrerasDestinatarias: carreras }),
+      ...(nivelExperienciaLegacy && { nivelExperiencia: nivelExperienciaLegacy }),
+    },
+  };
+}
+
 // ── Helper: resuelve la empresa desde el request ─────────────────────────────
 /**
  * Prioriza req.empresa (inyectado por verifyEmpresaMember) y como fallback
@@ -42,17 +97,18 @@ async function _resolverEmpresa(req) {
  */
 exports.getOfertas = async (req, res) => {
   try {
-    const { area, modalidad, ciudad, experiencia, q } = req.query;
+    const { area, modalidad, ciudad, experiencia, tipoPuesto, q } = req.query;
 
     // Solo se muestran ofertas activas y ya aprobadas por el admin
     const where = { estado: 'activa', moderada: true };
 
-    // Aplica los filtros de búsqueda si fueron enviados (búsqueda parcial e insensible a mayúsculas)
-    if (area) where.area = { [Op.iLike]: `%${area}%` };
-    if (modalidad) where.modalidad = modalidad;
-    if (ciudad) where.ciudad = { [Op.iLike]: `%${ciudad}%` };
+    if (area)       where.area = { [Op.iLike]: `%${area}%` };
+    if (modalidad)  where.modalidad = modalidad;
+    if (ciudad)     where.ciudad = { [Op.iLike]: `%${ciudad}%` };
+    if (tipoPuesto) where.tipoPuesto = tipoPuesto;
+    // Filtro legacy por nivelExperiencia — mantener para compatibilidad
     if (experiencia) where.nivelExperiencia = experiencia;
-    if (q) where.titulo = { [Op.iLike]: `%${q}%` }; // Búsqueda por texto en el título
+    if (q)          where.titulo = { [Op.iLike]: `%${q}%` };
 
     const ofertas = await Oferta.findAll({
       where,
@@ -119,7 +175,9 @@ exports.getOfertasRecomendadas = async (req, res) => {
       orConditions.push({ area: { [Op.iLike]: `%${perfil.areaInteres}%` } });
     }
     if (perfil?.carrera) {
-      // Fallback: la carrera también puede relacionarse con el área de la oferta
+      // Match exacto: carrera del alumno presente en carrerasDestinatarias de la oferta
+      orConditions.push({ carrerasDestinatarias: { [Op.contains]: [perfil.carrera] } });
+      // Fallback texto libre: la carrera puede relacionarse con el área de la oferta
       orConditions.push({ area: { [Op.iLike]: `%${perfil.carrera}%` } });
     }
     if (perfil?.habilidades?.length > 0) {
@@ -200,13 +258,19 @@ exports.createOferta = async (req, res) => {
     const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(400).json({ success: false, message: 'No tenés empresa registrada.' });
 
-    // Verifica que la empresa esté aprobada por el admin
     if (empresa.estadoAprobacion !== 'aprobada') {
       return res.status(403).json({ success: false, message: 'Tu empresa aún no fue aprobada.' });
     }
 
-    // Crea la oferta asociada a la empresa. moderada: false indica que está pendiente de revisión
-    const oferta = await Oferta.create({ ...req.body, empresaId: empresa.id, moderada: false });
+    const { error, campos } = validarCamposPuesto(req.body);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    const oferta = await Oferta.create({
+      ...req.body,
+      ...campos,
+      empresaId: empresa.id,
+      moderada: false,
+    });
     return res.status(201).json({ success: true, message: 'Oferta creada. Pendiente de moderación.', data: oferta });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error al crear la oferta.' });
@@ -225,7 +289,10 @@ exports.updateOferta = async (req, res) => {
     const oferta = await Oferta.findOne({ where: { id: req.params.id, empresaId: empresa.id } });
     if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
 
-    await oferta.update(req.body);
+    const { error, campos } = validarCamposPuesto(req.body);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    await oferta.update({ ...req.body, ...campos });
     return res.json({ success: true, data: oferta });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error al actualizar la oferta.' });

@@ -15,8 +15,15 @@ import { Link } from 'react-router-dom';
 import { ofertaService } from '../../services/api';
 import styles from './OfertasPage.module.css';
 
+const TIPO_PUESTO_LABEL = { pasante: '🎓 Pasante', trainee: '🌱 Trainee', junior: '💼 Junior' };
+
 // Tarjeta individual de oferta
 function OfertaCard({ oferta }) {
+  // Muestra tipoPuesto si existe (oferta nueva), si no fallback a nivelExperiencia legacy
+  const puestoBadge = oferta.tipoPuesto
+    ? TIPO_PUESTO_LABEL[oferta.tipoPuesto] ?? oferta.tipoPuesto
+    : oferta.nivelExperiencia?.replace(/_/g, ' ');
+
   return (
     <div className={styles.card}>
       {oferta.matchScore != null && (
@@ -25,13 +32,13 @@ function OfertaCard({ oferta }) {
       <h3 className={styles.cardTitle}>{oferta.titulo}</h3>
       <p className={styles.cardEmpresa}>{oferta.empresa?.razonSocial}</p>
       <div className={styles.cardMeta}>
-        {oferta.ciudad   && <span>📍 {oferta.ciudad}</span>}
-        {oferta.modalidad && <span>💼 {oferta.modalidad}</span>}
+        {oferta.ciudad     && <span>📍 {oferta.ciudad}</span>}
+        {oferta.modalidad  && <span>💼 {oferta.modalidad}</span>}
         {oferta.remuneracion && <span>💰 {oferta.remuneracion}</span>}
       </div>
-      {oferta.nivelExperiencia && (
-        <span className={`badge badge-${oferta.nivelExperiencia}`}>
-          {oferta.nivelExperiencia.replace(/_/g, ' ')}
+      {puestoBadge && (
+        <span className={`badge badge-puesto badge-${oferta.tipoPuesto ?? 'legacy'}`}>
+          {puestoBadge}
         </span>
       )}
       {oferta.fechaLimite && (
@@ -54,7 +61,7 @@ export default function OfertasPage() {
   const [loadingRec, setLoadingRec] = useState(false);
   const [recCargadas, setRecCargadas] = useState(false);
   const [filtros, setFiltros]       = useState({
-    q: '', area: '', modalidad: '', ciudad: '',
+    q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '',
   });
 
   // Carga todas las ofertas (con filtros)
@@ -91,7 +98,7 @@ export default function OfertasPage() {
   const handleFiltro  = (e) => setFiltros({ ...filtros, [e.target.name]: e.target.value });
   const handleBuscar  = (e) => { e.preventDefault(); cargarOfertas(); };
   const handleLimpiar = () => {
-    setFiltros({ q: '', area: '', modalidad: '', ciudad: '' });
+    setFiltros({ q: '', area: '', modalidad: '', ciudad: '', tipoPuesto: '' });
     setOfertas([]);
     setLoading(true);
     ofertaService.getAll({}).then(({ data }) => setOfertas(data.data ?? [])).finally(() => setLoading(false));
@@ -153,6 +160,12 @@ export default function OfertasPage() {
             <option value="remoto">Remoto</option>
             <option value="hibrido">Híbrido</option>
           </select>
+          <select name="tipoPuesto" value={filtros.tipoPuesto} onChange={handleFiltro}>
+            <option value="">Tipo de puesto</option>
+            <option value="pasante">🎓 Pasante</option>
+            <option value="trainee">🌱 Trainee</option>
+            <option value="junior">💼 Junior</option>
+          </select>
           <input
             name="ciudad"
             placeholder="Ciudad"
@@ -160,7 +173,7 @@ export default function OfertasPage() {
             onChange={handleFiltro}
           />
           <button type="submit" className="btn-primary">Buscar</button>
-          {(filtros.q || filtros.area || filtros.modalidad || filtros.ciudad) && (
+          {(filtros.q || filtros.area || filtros.modalidad || filtros.ciudad || filtros.tipoPuesto) && (
             <button type="button" className="btn-secondary" onClick={handleLimpiar}>
               Limpiar
             </button>

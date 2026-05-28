@@ -76,9 +76,43 @@ module.exports = (sequelize) => {
     habilidadesRequeridas: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
 
     // Nivel de experiencia esperado en el postulante
+    // LEGACY — se mantiene por compatibilidad con filtros y ofertas anteriores a Etapa 4
+    // Las nuevas ofertas deben usar tipoPuesto + requiereExperiencia en su lugar
     nivelExperiencia: {
       type: DataTypes.ENUM('sin_experiencia', 'junior', 'semi_senior'),
       defaultValue: 'sin_experiencia',
+    },
+
+    // ── Normalización de puesto y experiencia (Etapa 4) ───────────────────
+    // Reemplaza nivelExperiencia en los nuevos flujos de creación de ofertas
+
+    // Tipo de puesto ofrecido
+    // pasante: rol educativo, sin requerimiento de experiencia laboral
+    // trainee: incorporación con acompañamiento, puede valorar proyectos académicos
+    // junior:  requiere habilidades comprobables o experiencia inicial
+    tipoPuesto: {
+      type: DataTypes.STRING(20),
+      allowNull: true, // nullable para compatibilidad con ofertas anteriores
+    },
+
+    // Si true, se espera experiencia laboral previa o proyectos comprobables
+    requiereExperiencia: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+
+    // Aclaración opcional sobre la experiencia esperada
+    // Ej: "1 año en atención al cliente", "Proyectos académicos comprobables"
+    experienciaDetalle: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+
+    // Carreras del instituto a las que está orientada esta oferta
+    // Usa la lista canónica de catalogos.json para filtrar/recomendar por carrera del alumno
+    carrerasDestinatarias: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
     },
 
     // ── Fechas ────────────────────────────────────────────────────────────
