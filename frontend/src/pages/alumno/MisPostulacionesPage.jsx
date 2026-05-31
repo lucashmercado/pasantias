@@ -2,12 +2,12 @@
  * MisPostulacionesPage.jsx — Lista de postulaciones del alumno/egresado.
  *
  * Muestra todas las postulaciones del usuario con:
- * - Estado actual (en_revision, preseleccionado, entrevista_programada,
- *   no_seleccionado, contratado)
+ * - Estado actual (en_revision, preseleccionado, entrevista, contratado,
+ *   no_seleccionado)
  * - Fecha de última actualización
  * - Observaciones de la empresa (si existen)
  * - Botón "💬 Chatear con reclutador" solo cuando el estado lo habilita
- *   (preseleccionado, entrevista_programada, contratado)
+ *   (preseleccionado, entrevista, entrevista_programada, contratado)
  *
  * Ruta: /mis-postulaciones
  * Roles: alumno, egresado
@@ -22,13 +22,15 @@ import styles from './MisPostulacionesPage.module.css';
 const ESTADOS = {
   en_revision:           { label: 'En revisión',          color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
   preseleccionado:       { label: 'Preseleccionado',      color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  entrevista_programada: { label: 'Entrevista programada',color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  entrevista_programada: { label: 'Entrevista',           color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  entrevista:            { label: 'Entrevista',           color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
   no_seleccionado:       { label: 'No seleccionado',      color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+  rechazado:             { label: 'No seleccionado',      color: '#ef4444', icon: '❌', bg: '#fef2f2' },
   contratado:            { label: '¡Contratado!',         color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
 };
 
 // Estados que habilitan el chat con el reclutador
-const ESTADOS_CHAT = ['preseleccionado', 'entrevista_programada', 'contratado'];
+const ESTADOS_CHAT = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
 
 function formatFecha(dateStr) {
   if (!dateStr) return null;
@@ -197,7 +199,7 @@ export default function MisPostulacionesPage() {
                       {/* Chat: solo cuando la postulación está en estado activo */}
                       {ESTADOS_CHAT.includes(p.estado) && p.oferta?.empresa?.usuarioId && (
                         <Link
-                          to={`/chat?userId=${p.oferta.empresa.usuarioId}`}
+                          to={`/chat/${p.oferta.empresa.usuarioId}`}
                           className={styles.btnChat}
                           title="Chatear con el reclutador de esta empresa"
                         >

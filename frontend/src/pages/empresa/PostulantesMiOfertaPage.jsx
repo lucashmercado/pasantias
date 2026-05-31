@@ -20,9 +20,14 @@ const ESTADOS = [
   { estado: 'en_revision',           label: 'En revisión',    emoji: '📥', color: '#64748b', bg: '#f1f5f9' },
   { estado: 'preseleccionado',       label: 'Preseleccionado',emoji: '⭐', color: '#2563eb', bg: '#eff6ff' },
   { estado: 'entrevista_programada', label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
+  { estado: 'entrevista',            label: 'Entrevista',     emoji: '🎙️', color: '#7c3aed', bg: '#f5f3ff' },
   { estado: 'contratado',            label: 'Contratado',     emoji: '🎉', color: '#16a34a', bg: '#f0fdf4' },
   { estado: 'no_seleccionado',       label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
+  { estado: 'rechazado',             label: 'No seleccionado',emoji: '✕',  color: '#dc2626', bg: '#fef2f2' },
 ];
+
+// Estados que habilitan el botón de contacto/chat con el candidato
+const ESTADOS_CHAT_EMPRESA = ['preseleccionado', 'entrevista', 'entrevista_programada', 'contratado'];
 
 const ESTADO_MAP = Object.fromEntries(ESTADOS.map(e => [e.estado, e]));
 
@@ -207,20 +212,20 @@ export default function PostulantesMiOfertaPage() {
                         <div className={styles.candidatoInfo}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
-                            {p.estado === 'contratado' && p.usuario?.id && (
+                            {ESTADOS_CHAT_EMPRESA.includes(p.estado) && p.usuario?.id && (
                               <button
                                 onClick={() => navigate(`/chat/${p.usuario.id}`)}
-                                title="Abrir chat con este candidato"
+                                title="Contactar a este candidato"
                                 style={{
                                   display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                  background: '#16a34a', color: '#fff',
+                                  background: col?.color ?? '#2563eb', color: '#fff',
                                   border: 'none', borderRadius: '20px',
                                   padding: '2px 10px', fontSize: '0.75rem',
                                   fontWeight: 600, cursor: 'pointer',
                                   whiteSpace: 'nowrap',
                                 }}
                               >
-                                💬 Chatear
+                                💬 Contactar
                               </button>
                             )}
                           </div>
