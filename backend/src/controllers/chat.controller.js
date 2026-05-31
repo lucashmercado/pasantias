@@ -63,8 +63,19 @@ async function tienePostulacionActiva(usuarioAId, usuarioBId) {
       return false; // Combinación de roles no válida para el chat
     }
 
-    // Buscar la empresa asociada al usuario empresa
-    const empresa = await Empresa.findOne({ where: { usuarioId: empresaUserId } });
+    // 1. Buscar empresa directa (usuario es el propietario, empresa.usuarioId === su id)
+    let empresa = await Empresa.findOne({ where: { usuarioId: empresaUserId } });
+
+    // 2. Fallback: buscar via empresa_usuarios (reclutadores y admin_empresa agregados)
+    //    Cubre el caso donde el usuario empresa NO es el empresa.usuarioId directo.
+    if (!empresa) {
+      const membresia = await EmpresaUsuario.findOne({
+        where: { usuarioId: empresaUserId, activo: true },
+        include: [{ model: Empresa, as: 'empresa' }],
+      });
+      empresa = membresia?.empresa ?? null;
+    }
+
     if (!empresa) return false;
 
     // Buscar postulaciones del alumno a ofertas de esa empresa con estado habilitado
@@ -112,6 +123,7 @@ exports.buscarUsuarios = async (req, res) => {
       return res.json({ success: true, data: [] }); // Admin u otros no usan chat
     }
 
+    // Fetch sin includes para evitar problemas de Sequelize con limit + hasMany
     const usuarios = await Usuario.findAll({
       where: {
         id:     { [Op.ne]: userId },
@@ -124,34 +136,33 @@ exports.buscarUsuarios = async (req, res) => {
         ],
       },
       attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
-      include: [
-        {
-          model: EmpresaUsuario,
-          as: 'membresiasEmpresa',
-          required: false,
-          where: { activo: true },
-          attributes: [],
-          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
-        },
-        { model: Empresa, as: 'empresa', required: false, attributes: ['razonSocial'] },
-      ],
       limit: 20,
       order: [['nombre', 'ASC'], ['apellido', 'ASC']],
     });
 
-    // Aplanar razonSocial en el objeto usuario
-    const data = usuarios.map(u => {
-      const plain = u.toJSON();
-      return {
-        id:          plain.id,
-        nombre:      plain.nombre,
-        apellido:    plain.apellido,
-        email:       plain.email,
-        rol:         plain.rol,
-        razonSocial: plain.membresiasEmpresa?.[0]?.empresa?.razonSocial
-                  ?? plain.empresa?.razonSocial ?? null,
-      };
-    });
+    const data = usuarios.map(u => ({ ...u.toJSON(), razonSocial: null }));
+
+    // Batch lookup de razonSocial para usuarios empresa (mismo patrón que getConversaciones)
+    const empresaIds = data.filter(u => u.rol === 'empresa').map(u => u.id);
+    if (empresaIds.length > 0) {
+      const [membresias, directas] = await Promise.all([
+        EmpresaUsuario.findAll({
+          where: { usuarioId: { [Op.in]: empresaIds }, activo: true },
+          attributes: ['usuarioId'],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+        }),
+        Empresa.findAll({
+          where: { usuarioId: { [Op.in]: empresaIds } },
+          attributes: ['usuarioId', 'razonSocial'],
+        }),
+      ]);
+      const rsMap = {};
+      directas.forEach(e => { rsMap[e.usuarioId] = e.razonSocial; });
+      membresias.forEach(m => {
+        if (m.empresa?.razonSocial) rsMap[m.usuarioId] = m.empresa.razonSocial;
+      });
+      data.forEach(u => { u.razonSocial = rsMap[u.id] ?? null; });
+    }
 
     return res.json({ success: true, total: data.length, data });
   } catch (error) {
@@ -374,33 +385,20 @@ exports.getHistorial = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No podés chatear con vos mismo.' });
     }
 
-    // Verifica que el otro usuario exista e incluye datos de empresa si aplica
+    // Verifica que el otro usuario exista (sin includes para evitar 500 de Sequelize)
     const partner = await Usuario.findOne({
       where: { id: partnerId },
       attributes: ['id', 'nombre', 'apellido', 'fotoPerfil', 'rol', 'ultimoAcceso'],
-      include: [
-        {
-          model: EmpresaUsuario,
-          as: 'membresiasEmpresa',
-          required: false,
-          where: { activo: true },
-          attributes: [],
-          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
-        },
-        { model: Empresa, as: 'empresa', required: false, attributes: ['razonSocial'] },
-      ],
     });
     if (!partner) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
     }
 
-    // Serializar razonSocial a nivel plano
+    // Resolver razonSocial usando el helper existente (evita includes problemáticos)
     const partnerData = partner.toJSON();
-    partnerData.razonSocial =
-      partnerData.membresiasEmpresa?.[0]?.empresa?.razonSocial ??
-      partnerData.empresa?.razonSocial ?? null;
-    delete partnerData.membresiasEmpresa;
-    delete partnerData.empresa;
+    partnerData.razonSocial = partner.rol === 'empresa'
+      ? await resolverRazonSocial(partnerId)
+      : null;
 
     const { count, rows: mensajes } = await Mensaje.findAndCountAll({
       where: {

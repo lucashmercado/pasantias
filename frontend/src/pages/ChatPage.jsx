@@ -240,6 +240,9 @@ export default function ChatPage() {
   const [convActivaId,    setConvActivaId]    = useState(
     usuarioIdParam ? Number(usuarioIdParam) : null
   );
+  // partnerInfo: datos del interlocutor activo, poblado desde getHistorial.
+  // Cubre el caso en que no hay conversación previa (convActivaObj undefined).
+  const [partnerInfo,     setPartnerInfo]     = useState(null);
   const [mensajes,        setMensajes]        = useState([]);
   const [nuevoMensaje,    setNuevoMensaje]    = useState('');
   const [loadingConvs,    setLoadingConvs]    = useState(true);
@@ -293,6 +296,10 @@ export default function ChatPage() {
         const { data } = await mensajeService.getMensajes(convActivaId);
         const lista = data.data ?? data ?? [];
         setMensajes(lista);
+        // Capturar datos del interlocutor devueltos por getHistorial.
+        // Esto permite mostrar nombre/empresa aunque no haya mensajes previos
+        // ni la conversación esté en la lista de conversaciones.
+        if (data.usuario) setPartnerInfo(data.usuario);
         mensajeService.marcarLeida(convActivaId).catch(() => {});
         setConversaciones((prev) =>
           prev.map((c) =>
@@ -350,16 +357,15 @@ export default function ChatPage() {
     setModalAbierto(false);
     const partnerId = usuarioSeleccionado.id;
 
-    // Si ya existe la conversación, abrirla
+    // Guardar datos del interlocutor inmediatamente para que el header
+    // lo muestre antes de que getHistorial responda.
+    setPartnerInfo(usuarioSeleccionado);
+
+    // Si ya existe la conversación, abrirla; si no, agregar entrada temporal
     const existente = conversaciones.find((c) => c.usuario?.id === partnerId);
     if (!existente) {
-      // Agregar una conversación nueva vacía a la lista
       setConversaciones((prev) => [
-        {
-          usuario: usuarioSeleccionado,
-          ultimoMensaje: null,
-          noLeidos: 0,
-        },
+        { usuario: usuarioSeleccionado, ultimoMensaje: null, noLeidos: 0 },
         ...prev,
       ]);
     }
@@ -371,6 +377,9 @@ export default function ChatPage() {
 
   /* ── Conversación activa (objeto completo) ─────────────────────────────── */
   const convActivaObj = conversaciones.find((c) => c.usuario?.id === convActivaId);
+  // partnerActivo: interlocutor real. Usa la conversación de la lista si existe;
+  // si no (primera vez sin mensajes), usa partnerInfo cargado desde getHistorial.
+  const partnerActivo = convActivaObj?.usuario ?? partnerInfo;
 
   return (
     <>
@@ -460,13 +469,34 @@ export default function ChatPage() {
                 >
                   ←
                 </button>
-                <Avatar nombre={convActivaObj?.usuario?.nombre} size={36} />
+                <Avatar nombre={partnerActivo?.nombre} size={36} />
                 <div className={styles.chatHeaderInfo}>
                   <strong>
-                    {displayNombre(convActivaObj?.usuario)}
+                    {loadingMensajes && !partnerActivo
+                      ? 'Cargando...'
+                      : displayNombre(partnerActivo)}
                   </strong>
-                  <span>{convActivaObj?.usuario?.email}</span>
+                  <span>{partnerActivo?.email}</span>
                 </div>
+                {/* Ver perfil — pendiente de implementar rutas de perfil público */}
+                <button
+                  className={styles.verPerfilBtn}
+                  disabled
+                  title="Ver perfil (próximamente)"
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '4px 12px',
+                    fontSize: '0.78rem',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border, #e2e8f0)',
+                    background: 'transparent',
+                    color: 'var(--text-muted, #64748b)',
+                    cursor: 'not-allowed',
+                    opacity: 0.6,
+                  }}
+                >
+                  Ver perfil
+                </button>
               </div>
 
               {/* Mensajes */}

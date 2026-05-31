@@ -18,16 +18,25 @@ import { Link } from 'react-router-dom';
 import { postulacionService } from '../../services/api';
 import styles from './MisPostulacionesPage.module.css';
 
-// Configuración de estados con color, etiqueta e ícono
+// Mapa completo de estados para display en badges (incluye aliases legacy)
 const ESTADOS = {
-  en_revision:           { label: 'En revisión',          color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
-  preseleccionado:       { label: 'Preseleccionado',      color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
-  entrevista_programada: { label: 'Entrevista',           color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  entrevista:            { label: 'Entrevista',           color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
-  no_seleccionado:       { label: 'No seleccionado',      color: '#ef4444', icon: '❌', bg: '#fef2f2' },
-  rechazado:             { label: 'No seleccionado',      color: '#ef4444', icon: '❌', bg: '#fef2f2' },
-  contratado:            { label: '¡Contratado!',         color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
+  en_revision:           { label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
+  preseleccionado:       { label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
+  entrevista:            { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  entrevista_programada: { label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' }, // legacy
+  no_seleccionado:       { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+  rechazado:             { label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' }, // legacy
+  contratado:            { label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
 };
+
+// Solo estados canónicos para la grilla de resumen y filtro (sin duplicados)
+const ESTADOS_RESUMEN = [
+  { key: 'en_revision',     aliases: [],                        label: 'En revisión',     color: '#f59e0b', icon: '🔍', bg: '#fffbeb' },
+  { key: 'preseleccionado', aliases: [],                        label: 'Preseleccionado', color: '#3b82f6', icon: '✅', bg: '#eff6ff' },
+  { key: 'entrevista',      aliases: ['entrevista_programada'], label: 'Entrevista',      color: '#8b5cf6', icon: '🗓️', bg: '#f5f3ff' },
+  { key: 'contratado',      aliases: [],                        label: '¡Contratado!',    color: '#10b981', icon: '🎉', bg: '#ecfdf5' },
+  { key: 'no_seleccionado', aliases: ['rechazado'],             label: 'No seleccionado', color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+];
 
 // Estados que habilitan el chat con el reclutador
 const ESTADOS_CHAT = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
@@ -63,13 +72,19 @@ export default function MisPostulacionesPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  // Filtrar incluyendo aliases legacy cuando el filtro activo es un estado canónico
+  const filtroCanonInfo = ESTADOS_RESUMEN.find(e => e.key === filtroEstado);
   const filtradas = filtroEstado
-    ? postulaciones.filter((p) => p.estado === filtroEstado)
+    ? postulaciones.filter((p) =>
+        p.estado === filtroEstado || (filtroCanonInfo?.aliases.includes(p.estado) ?? false)
+      )
     : postulaciones;
 
-  // Conteo por estado para los tabs/filtros
-  const conteos = postulaciones.reduce((acc, p) => {
-    acc[p.estado] = (acc[p.estado] || 0) + 1;
+  // Conteo agrupado: alias legacy se suma al estado canónico correspondiente
+  const conteoCanonicos = ESTADOS_RESUMEN.reduce((acc, e) => {
+    acc[e.key] = postulaciones.filter(p =>
+      p.estado === e.key || e.aliases.includes(p.estado)
+    ).length;
     return acc;
   }, {});
 
@@ -111,18 +126,18 @@ export default function MisPostulacionesPage() {
         <>
           {/* ── Resumen visual ───────────────────────────────────────────── */}
           <div className={styles.resumenGrid}>
-            {Object.entries(ESTADOS).map(([key, cfg]) => (
+            {ESTADOS_RESUMEN.map((e) => (
               <button
-                key={key}
-                className={`${styles.resumenCard} ${filtroEstado === key ? styles.resumenCardActive : ''}`}
-                style={filtroEstado === key ? { borderColor: cfg.color, background: cfg.bg } : {}}
-                onClick={() => setFiltroEstado(filtroEstado === key ? '' : key)}
+                key={e.key}
+                className={`${styles.resumenCard} ${filtroEstado === e.key ? styles.resumenCardActive : ''}`}
+                style={filtroEstado === e.key ? { borderColor: e.color, background: e.bg } : {}}
+                onClick={() => setFiltroEstado(filtroEstado === e.key ? '' : e.key)}
               >
-                <span className={styles.resumenIcon}>{cfg.icon}</span>
-                <span className={styles.resumenCount} style={filtroEstado === key ? { color: cfg.color } : {}}>
-                  {conteos[key] ?? 0}
+                <span className={styles.resumenIcon}>{e.icon}</span>
+                <span className={styles.resumenCount} style={filtroEstado === e.key ? { color: e.color } : {}}>
+                  {conteoCanonicos[e.key] ?? 0}
                 </span>
-                <span className={styles.resumenLabel}>{cfg.label}</span>
+                <span className={styles.resumenLabel}>{e.label}</span>
               </button>
             ))}
           </div>
@@ -130,7 +145,7 @@ export default function MisPostulacionesPage() {
           {/* Indicador de filtro activo */}
           {filtroEstado && (
             <div className={styles.filtroActivo}>
-              Mostrando: <strong>{ESTADOS[filtroEstado]?.label}</strong>
+              Mostrando: <strong>{filtroCanonInfo?.label ?? ESTADOS[filtroEstado]?.label}</strong>
               <button className={styles.limpiarFiltro} onClick={() => setFiltroEstado('')}>
                 ✕ Limpiar filtro
               </button>
