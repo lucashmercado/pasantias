@@ -14,12 +14,29 @@
 
 'use strict';
 
-const { Mensaje, Usuario, Postulacion, Oferta, Empresa } = require('../models');
+const { Mensaje, Usuario, Postulacion, Oferta, Empresa, EmpresaUsuario } = require('../models');
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 
 // Estados de postulación que habilitan el chat
 const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
+
+/**
+ * Resuelve la razón social de un usuario con rol 'empresa'.
+ * 1. Busca membresía activa en empresa_usuarios (reclutadores / admin_empresa)
+ * 2. Fallback: propietario directo (empresa.usuarioId)
+ * Devuelve null si no aplica.
+ */
+async function resolverRazonSocial(usuarioId) {
+  const membresia = await EmpresaUsuario.findOne({
+    where: { usuarioId, activo: true },
+    attributes: [],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+  });
+  if (membresia?.empresa?.razonSocial) return membresia.empresa.razonSocial;
+  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['razonSocial'] });
+  return empresa?.razonSocial ?? null;
+}
 
 // ── Helper: verificar que el par tenga postulación activa ─────────────────────
 /**
@@ -107,11 +124,36 @@ exports.buscarUsuarios = async (req, res) => {
         ],
       },
       attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+      include: [
+        {
+          model: EmpresaUsuario,
+          as: 'membresiasEmpresa',
+          required: false,
+          where: { activo: true },
+          attributes: [],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+        },
+        { model: Empresa, as: 'empresa', required: false, attributes: ['razonSocial'] },
+      ],
       limit: 20,
       order: [['nombre', 'ASC'], ['apellido', 'ASC']],
     });
 
-    return res.json({ success: true, total: usuarios.length, data: usuarios });
+    // Aplanar razonSocial en el objeto usuario
+    const data = usuarios.map(u => {
+      const plain = u.toJSON();
+      return {
+        id:          plain.id,
+        nombre:      plain.nombre,
+        apellido:    plain.apellido,
+        email:       plain.email,
+        rol:         plain.rol,
+        razonSocial: plain.membresiasEmpresa?.[0]?.empresa?.razonSocial
+                  ?? plain.empresa?.razonSocial ?? null,
+      };
+    });
+
+    return res.json({ success: true, total: data.length, data });
   } catch (error) {
     console.error('Error en buscarUsuarios:', error);
     return res.status(500).json({ success: false, message: 'Error al buscar usuarios.' });
@@ -164,7 +206,42 @@ exports.getConversaciones = async (req, res) => {
       }
     }
 
-    const conversaciones = Array.from(mapa.values());
+    // Convertir a objetos planos para poder agregar razonSocial
+    const conversaciones = Array.from(mapa.values()).map(c => ({
+      usuario: c.usuario?.toJSON ? c.usuario.toJSON() : { ...c.usuario },
+      ultimoMensaje: c.ultimoMensaje,
+      noLeidos: c.noLeidos,
+    }));
+
+    // Batch lookup de empresa para usuarios con rol 'empresa'
+    const empresaUserIds = conversaciones
+      .filter(c => c.usuario.rol === 'empresa')
+      .map(c => c.usuario.id);
+
+    if (empresaUserIds.length > 0) {
+      const [membresias, directas] = await Promise.all([
+        EmpresaUsuario.findAll({
+          where: { usuarioId: { [Op.in]: empresaUserIds }, activo: true },
+          attributes: ['usuarioId'],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+        }),
+        Empresa.findAll({
+          where: { usuarioId: { [Op.in]: empresaUserIds } },
+          attributes: ['usuarioId', 'razonSocial'],
+        }),
+      ]);
+
+      const razonSocialMap = {};
+      directas.forEach(e => { razonSocialMap[e.usuarioId] = e.razonSocial; });
+      // Membresías tienen precedencia sobre propietario directo
+      membresias.forEach(m => {
+        if (m.empresa?.razonSocial) razonSocialMap[m.usuarioId] = m.empresa.razonSocial;
+      });
+
+      conversaciones.forEach(c => {
+        c.usuario.razonSocial = razonSocialMap[c.usuario.id] ?? null;
+      });
+    }
 
     return res.json({
       success: true,
@@ -297,14 +374,33 @@ exports.getHistorial = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No podés chatear con vos mismo.' });
     }
 
-    // Verifica que el otro usuario exista
+    // Verifica que el otro usuario exista e incluye datos de empresa si aplica
     const partner = await Usuario.findOne({
       where: { id: partnerId },
       attributes: ['id', 'nombre', 'apellido', 'fotoPerfil', 'rol', 'ultimoAcceso'],
+      include: [
+        {
+          model: EmpresaUsuario,
+          as: 'membresiasEmpresa',
+          required: false,
+          where: { activo: true },
+          attributes: [],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+        },
+        { model: Empresa, as: 'empresa', required: false, attributes: ['razonSocial'] },
+      ],
     });
     if (!partner) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
     }
+
+    // Serializar razonSocial a nivel plano
+    const partnerData = partner.toJSON();
+    partnerData.razonSocial =
+      partnerData.membresiasEmpresa?.[0]?.empresa?.razonSocial ??
+      partnerData.empresa?.razonSocial ?? null;
+    delete partnerData.membresiasEmpresa;
+    delete partnerData.empresa;
 
     const { count, rows: mensajes } = await Mensaje.findAndCountAll({
       where: {
@@ -329,7 +425,7 @@ exports.getHistorial = async (req, res) => {
       total: count,
       pagina,
       totalPaginas: Math.ceil(count / limite),
-      usuario: partner,
+      usuario: partnerData,
       // Invierte el orden para mostrar del más antiguo al más reciente
       data: mensajes.reverse(),
     });

@@ -49,6 +49,16 @@ const ROL_LABEL = {
   admin:    '⚙️ Admin',
 };
 
+/**
+ * Devuelve "Nombre Apellido — Empresa SRL" si el usuario tiene razonSocial.
+ * Para alumnos/egresados/admin devuelve solo "Nombre Apellido".
+ */
+function displayNombre(usuario) {
+  const nombre = `${usuario?.nombre ?? ''} ${usuario?.apellido ?? ''}`.trim() || 'Usuario';
+  if (usuario?.razonSocial) return `${nombre} — ${usuario.razonSocial}`;
+  return nombre;
+}
+
 /** Avatar circular con inicial */
 function Avatar({ nombre, size = 36, color = 'var(--primary)' }) {
   return (
@@ -67,8 +77,6 @@ function Avatar({ nombre, size = 36, color = 'var(--primary)' }) {
  */
 function ConversacionItem({ conv, activo, onClick }) {
   const noLeidos = conv.noLeidos ?? 0;
-  const nombre = conv.usuario?.nombre ?? '';
-  const apellido = conv.usuario?.apellido ?? '';
   return (
     <div
       className={`${styles.convItem} ${activo ? styles.convActivo : ''}`}
@@ -77,11 +85,11 @@ function ConversacionItem({ conv, activo, onClick }) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
-      <Avatar nombre={nombre} color={activo ? '#fff' : 'var(--primary)'} />
+      <Avatar nombre={conv.usuario?.nombre} color={activo ? '#fff' : 'var(--primary)'} />
       <div className={styles.convInfo}>
         <div className={styles.convNombreRow}>
           <strong className={styles.convNombre}>
-            {nombre} {apellido}
+            {displayNombre(conv.usuario)}
           </strong>
           <span className={styles.convHora}>
             {formatHora(conv.ultimoMensaje?.createdAt)}
@@ -210,7 +218,7 @@ function NuevoChatModal({ onClose, onSeleccionar }) {
             >
               <Avatar nombre={u.nombre} size={40} />
               <div className={styles.modalResultadoInfo}>
-                <strong>{u.nombre} {u.apellido}</strong>
+                <strong>{displayNombre(u)}</strong>
                 <span>{u.email}</span>
                 <span className={styles.modalRolBadge}>{ROL_LABEL[u.rol] ?? u.rol}</span>
               </div>
@@ -455,7 +463,7 @@ export default function ChatPage() {
                 <Avatar nombre={convActivaObj?.usuario?.nombre} size={36} />
                 <div className={styles.chatHeaderInfo}>
                   <strong>
-                    {convActivaObj?.usuario?.nombre} {convActivaObj?.usuario?.apellido}
+                    {displayNombre(convActivaObj?.usuario)}
                   </strong>
                   <span>{convActivaObj?.usuario?.email}</span>
                 </div>
