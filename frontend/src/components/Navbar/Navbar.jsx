@@ -159,17 +159,15 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* Badge de notificaciones */}
-          {noLeidas > 0 && (
-            <button
-              className={`${styles.notifBadge} ${notifColor}`}
-              title={`${noLeidas} notificación${noLeidas !== 1 ? 'es' : ''} sin leer`}
-              onClick={() => navigate('/notificaciones')}
-              aria-label={`${noLeidas} notificaciones`}
-            >
-              🔔 {noLeidas > 9 ? '9+' : noLeidas}
-            </button>
-          )}
+          {/* Campana de notificaciones — siempre visible; badge solo si hay sin leer */}
+          <button
+            className={`${styles.notifBadge} ${notifColor}`}
+            title={noLeidas > 0 ? `${noLeidas} notificación${noLeidas !== 1 ? 'es' : ''} sin leer` : 'Notificaciones'}
+            onClick={() => navigate('/notificaciones')}
+            aria-label="Notificaciones"
+          >
+            🔔{noLeidas > 0 && <> {noLeidas > 9 ? '9+' : noLeidas}</>}
+          </button>
 
           {/* Menú usuario */}
           <div

@@ -30,6 +30,7 @@ const {
 
 const { sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { crearNotificacion } = require('../utils/notificador');
 
 // ── Helper: envío de email (reutilizable) ─────────────────────────────────────
 async function enviarEmail({ to, subject, html }) {
@@ -428,6 +429,25 @@ router.patch('/ofertas/:id/moderar', ...soloAdmin, async (req, res) => {
   if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
   await oferta.update({ moderada: aprobada, estado: aprobada ? 'activa' : 'cerrada' });
   await logAction({ usuarioId: req.usuario.id, accion: aprobada ? 'aprobar_oferta' : 'rechazar_oferta', entidad: 'oferta', entidadId: oferta.id, detalle: { titulo: oferta.titulo }, ip: req.ip });
+
+  // Notificar a la empresa que su oferta fue aprobada o rechazada
+  try {
+    const empresaOferta = await Empresa.findByPk(oferta.empresaId, { attributes: ['usuarioId'] });
+    if (empresaOferta?.usuarioId) {
+      await crearNotificacion({
+        usuarioId: empresaOferta.usuarioId,
+        titulo: aprobada ? '✅ Tu oferta fue aprobada' : '❌ Tu oferta fue rechazada',
+        mensaje: aprobada
+          ? `La oferta "${oferta.titulo}" fue aprobada y ya está publicada.`
+          : `La oferta "${oferta.titulo}" fue rechazada por el administrador.`,
+        tipo: 'oferta',
+        tipoVisual: aprobada ? 'success' : 'error',
+        enlace: '/empresa',
+        accionURL: '/empresa',
+      });
+    }
+  } catch (e) { console.error('[Admin] Error notif moderación oferta:', e.message); }
+
   return res.json({ success: true, message: aprobada ? 'Oferta aprobada.' : 'Oferta rechazada.' });
 });
 
@@ -872,6 +892,22 @@ router.patch('/solicitudes-reclutador/:id/aprobar', ...soloAdmin, async (req, re
 
     await logAction({ usuarioId: req.usuario.id, accion: 'aprobar_solicitud_reclutador', entidad: 'solicitud_reclutador', entidadId: solicitud.id, detalle: { email: solicitud.email, empresaId: solicitud.empresaId }, ip: req.ip });
 
+    // Notificación in-app al admin_empresa de la empresa
+    try {
+      const empresaOwner = solicitud.empresa?.usuarioId;
+      if (empresaOwner) {
+        await crearNotificacion({
+          usuarioId: empresaOwner,
+          titulo: '✅ Solicitud de reclutador aprobada',
+          mensaje: `${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} ya puede acceder al sistema como reclutador.`,
+          tipo: 'sistema',
+          tipoVisual: 'success',
+          enlace: '/empresa/equipo',
+          accionURL: '/empresa/equipo',
+        });
+      }
+    } catch (e) { console.error('[Admin] Error notif aprobación reclutador:', e.message); }
+
     const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
 
     // Email al reclutador con credenciales
@@ -939,7 +975,23 @@ router.patch('/solicitudes-reclutador/:id/rechazar', ...soloAdmin, async (req, r
 
     await logAction({ usuarioId: req.usuario.id, accion: 'rechazar_solicitud_reclutador', entidad: 'solicitud_reclutador', entidadId: solicitud.id, detalle: { email: solicitud.email, motivo }, ip: req.ip });
 
-    // Notificar a la empresa (propietario)
+    // Notificación in-app al admin_empresa
+    try {
+      const empresaOwner = solicitud.empresa?.usuarioId;
+      if (empresaOwner) {
+        await crearNotificacion({
+          usuarioId: empresaOwner,
+          titulo: '❌ Solicitud de reclutador rechazada',
+          mensaje: `La solicitud para ${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} (${solicitud.email}) no fue aprobada.${motivo ? ` Motivo: ${motivo}` : ''}`,
+          tipo: 'sistema',
+          tipoVisual: 'error',
+          enlace: '/empresa/equipo',
+          accionURL: '/empresa/equipo',
+        });
+      }
+    } catch (e) { console.error('[Admin] Error notif rechazo reclutador:', e.message); }
+
+    // Notificar a la empresa (propietario) por email
     try {
       const propietario = await Usuario.findByPk(solicitud.empresa?.usuarioId);
       if (propietario) {

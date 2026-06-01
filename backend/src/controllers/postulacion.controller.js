@@ -107,7 +107,8 @@ exports.postular = async (req, res) => {
       titulo: 'Nueva postulación recibida',
       mensaje: `${req.usuario.nombre} ${req.usuario.apellido} se postuló a "${oferta.titulo}".`,
       tipo: 'postulacion',
-      enlace: `/empresa/postulaciones/${postulacion.id}`,
+      enlace: `/empresa/postulantes/${ofertaId}`,
+      accionURL: `/empresa/postulantes/${ofertaId}`,
     });
 
     // Registra la postulación en el log de auditoría (antes del return)
@@ -322,7 +323,8 @@ exports.updateEstado = async (req, res) => {
         titulo: estadoTexto[estado] || 'Estado actualizado',
         mensaje: `Tu postulación para "${postulacion.oferta.titulo}" cambió a: ${estado.replace(/_/g, ' ')}.`,
         tipo: 'estado',
-        enlace: `/mis-postulaciones/${postulacion.id}`,
+        enlace: '/mis-postulaciones',
+        accionURL: '/mis-postulaciones',
       });
     }
 
