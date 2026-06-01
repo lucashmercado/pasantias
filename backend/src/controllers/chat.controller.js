@@ -1,13 +1,19 @@
 /**
  * chat.controller.js — Controlador del sistema de mensajería directa.
  *
- * Implementa chat 1-a-1 entre alumnos/egresados y reclutadores (empresa).
- * El chat solo está disponible cuando existe una postulación en estado activo
- * (preseleccionado, entrevista_programada, entrevista o contratado) entre las dos partes.
+ * Chat comunitario institucional con reglas por rol:
+ *   alumno/egresado ↔ alumno/egresado  → permitido
+ *   alumno/egresado ↔ empresa          → permitido
+ *   empresa         ↔ empresa (misma)  → permitido
+ *   empresa         ↔ empresa (distinta)→ bloqueado
+ *   admin           ↔ cualquiera       → bloqueado
+ *
+ * La postulación ya NO es requisito para chatear.
+ * Solo sirve como contexto para el botón "Contactar" en el panel de candidatos.
  *
  * Endpoints:
  * - GET  /api/chat                → Lista de conversaciones del usuario autenticado
- * - POST /api/chat                → Enviar un mensaje (requiere postulación activa)
+ * - POST /api/chat                → Enviar un mensaje
  * - GET  /api/chat/:usuarioId     → Historial de mensajes con un usuario específico
  * - PATCH /api/chat/:usuarioId/leer → Marcar mensajes de una conversación como leídos
  */
@@ -18,7 +24,7 @@ const { Mensaje, Usuario, Postulacion, Oferta, Empresa, EmpresaUsuario } = requi
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 
-// Estados de postulación que habilitan el chat
+// Estados de postulación relevantes (usados como contexto para "Contactar", no como requisito de chat)
 const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
 
 /**
@@ -38,71 +44,102 @@ async function resolverRazonSocial(usuarioId) {
   return empresa?.razonSocial ?? null;
 }
 
-// ── Helper: verificar que el par tenga postulación activa ─────────────────────
+// ── Helper: IDs de empresa a los que pertenece un usuario ────────────────────
 /**
- * Devuelve true si existe al menos una postulación entre el alumno y la empresa
- * con estado que habilita el chat.
- *
- * Soporta ambas direcciones: alumno como emisor o como receptor.
+ * Devuelve un Set con los IDs de empresa a los que pertenece el usuario.
+ * Considera empresa.usuarioId (propietario directo) y empresa_usuarios (equipo).
  */
-async function tienePostulacionActiva(usuarioAId, usuarioBId) {
+async function resolverEmpresasDeUsuario(usuarioId) {
+  const [directa, membresias] = await Promise.all([
+    Empresa.findOne({ where: { usuarioId }, attributes: ['id'] }),
+    EmpresaUsuario.findAll({ where: { usuarioId, activo: true }, attributes: ['empresaId'] }),
+  ]);
+  const ids = new Set(membresias.map(m => m.empresaId));
+  if (directa) ids.add(directa.id);
+  return ids;
+}
+
+/**
+ * Devuelve true si ambos usuarios pertenecen a al menos una empresa en común.
+ */
+async function comparteMismaEmpresa(usuarioAId, usuarioBId) {
+  const [empresasA, empresasB] = await Promise.all([
+    resolverEmpresasDeUsuario(usuarioAId),
+    resolverEmpresasDeUsuario(usuarioBId),
+  ]);
+  for (const id of empresasA) {
+    if (empresasB.has(id)) return true;
+  }
+  return false;
+}
+
+// ── Helper: verificar si dos usuarios pueden chatear ─────────────────────────
+/**
+ * puedeChatear(emisorId, receptorId) → { ok: boolean, motivo?: string }
+ *
+ * Reglas:
+ *   alumno/egresado ↔ alumno/egresado  → ok
+ *   alumno/egresado ↔ empresa          → ok
+ *   empresa ↔ empresa (misma empresa)  → ok
+ *   empresa ↔ empresa (distinta)        → 403
+ *   admin ↔ cualquiera                 → 403
+ *   usuario inactivo/deshabilitado      → 403
+ */
+async function puedeChatear(emisorId, receptorId) {
   try {
-    const [uA, uB] = await Promise.all([
-      Usuario.findByPk(usuarioAId, { attributes: ['id', 'rol'] }),
-      Usuario.findByPk(usuarioBId, { attributes: ['id', 'rol'] }),
+    const [emisor, receptor] = await Promise.all([
+      Usuario.findByPk(emisorId,  { attributes: ['id', 'rol', 'activo', 'habilitado'] }),
+      Usuario.findByPk(receptorId, { attributes: ['id', 'rol', 'activo', 'habilitado'] }),
     ]);
 
-    if (!uA || !uB) return false;
+    if (!emisor || !receptor) return { ok: false, motivo: 'Usuario no encontrado.' };
 
-    let alumnoId, empresaUserId;
-    if (['alumno', 'egresado'].includes(uA.rol) && uB.rol === 'empresa') {
-      alumnoId = uA.id; empresaUserId = uB.id;
-    } else if (['alumno', 'egresado'].includes(uB.rol) && uA.rol === 'empresa') {
-      alumnoId = uB.id; empresaUserId = uA.id;
-    } else {
-      return false; // Combinación de roles no válida para el chat
+    if (!emisor.activo || !emisor.habilitado) {
+      return { ok: false, motivo: 'Tu cuenta no está activa.' };
+    }
+    if (!receptor.activo || !receptor.habilitado) {
+      return { ok: false, motivo: 'El destinatario no tiene una cuenta activa.' };
     }
 
-    // 1. Buscar empresa directa (usuario es el propietario, empresa.usuarioId === su id)
-    let empresa = await Empresa.findOne({ where: { usuarioId: empresaUserId } });
-
-    // 2. Fallback: buscar via empresa_usuarios (reclutadores y admin_empresa agregados)
-    //    Cubre el caso donde el usuario empresa NO es el empresa.usuarioId directo.
-    if (!empresa) {
-      const membresia = await EmpresaUsuario.findOne({
-        where: { usuarioId: empresaUserId, activo: true },
-        include: [{ model: Empresa, as: 'empresa' }],
-      });
-      empresa = membresia?.empresa ?? null;
+    if (emisor.rol === 'admin' || receptor.rol === 'admin') {
+      return { ok: false, motivo: 'Los administradores del sistema no participan en el chat.' };
     }
 
-    if (!empresa) return false;
+    const emisorEsAlumno   = ['alumno', 'egresado'].includes(emisor.rol);
+    const receptorEsAlumno = ['alumno', 'egresado'].includes(receptor.rol);
+    const emisorEsEmpresa  = emisor.rol  === 'empresa';
+    const receptorEsEmpresa = receptor.rol === 'empresa';
 
-    // Buscar postulaciones del alumno a ofertas de esa empresa con estado habilitado
-    // ⚠️ El campo correcto es 'usuarioId', no 'alumnoId'
-    const postulacion = await Postulacion.findOne({
-      where: { usuarioId: alumnoId, estado: { [Op.in]: ESTADOS_CHAT_HABILITADO } },
-      include: [{
-        model: Oferta,
-        as: 'oferta',
-        where: { empresaId: empresa.id },
-        required: true,
-      }],
-    });
+    // alumno/egresado ↔ alumno/egresado
+    if (emisorEsAlumno && receptorEsAlumno) return { ok: true };
 
-    return postulacion !== null;
+    // alumno/egresado ↔ empresa (ambas direcciones)
+    if ((emisorEsAlumno && receptorEsEmpresa) || (emisorEsEmpresa && receptorEsAlumno)) {
+      return { ok: true };
+    }
+
+    // empresa ↔ empresa: solo si comparten empresa
+    if (emisorEsEmpresa && receptorEsEmpresa) {
+      const misma = await comparteMismaEmpresa(emisorId, receptorId);
+      if (misma) return { ok: true };
+      return { ok: false, motivo: 'El chat entre empresas distintas no está habilitado en esta plataforma.' };
+    }
+
+    return { ok: false, motivo: 'Combinación de roles no válida para el chat.' };
   } catch (err) {
-    console.error('[Chat] Error en tienePostulacionActiva:', err.message);
-    return false;
+    console.error('[Chat] Error en puedeChatear:', err.message);
+    return { ok: false, motivo: 'Error al verificar permisos de chat.' };
   }
 }
 
 // ── Buscar usuarios para iniciar un nuevo chat ────────────────────────────────
 /**
  * GET /api/chat/usuarios?q=texto
- * Busca usuarios activos por nombre, apellido o email.
- * Solo muestra usuarios con los que se puede chatear (alumno/egresado ↔ empresa).
- * Excluye al propio usuario autenticado y al rol 'admin'.
+ *
+ * Reglas de visibilidad por rol:
+ *   alumno/egresado → ve: alumno, egresado, empresa
+ *   empresa         → ve: alumno, egresado + compañeros de su misma empresa
+ *   admin           → sin resultados
  */
 exports.buscarUsuarios = async (req, res) => {
   try {
@@ -113,46 +150,103 @@ exports.buscarUsuarios = async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    // Roles que pueden aparecer en la búsqueda según el rol del emisor
-    let rolesVisibles;
-    if (['alumno', 'egresado'].includes(rol)) {
-      rolesVisibles = ['empresa'];          // Alumno solo busca reclutadores
-    } else if (rol === 'empresa') {
-      rolesVisibles = ['alumno', 'egresado']; // Empresa solo busca alumnos
-    } else {
-      return res.json({ success: true, data: [] }); // Admin u otros no usan chat
+    // Admin no usa el chat
+    if (rol === 'admin') {
+      return res.json({ success: true, total: 0, data: [] });
     }
 
-    // Fetch sin includes para evitar problemas de Sequelize con limit + hasMany
-    const usuarios = await Usuario.findAll({
-      where: {
-        id:     { [Op.ne]: userId },
-        activo: true,
-        rol:    { [Op.in]: rolesVisibles },
-        [Op.or]: [
-          { nombre:   { [Op.iLike]: `%${q}%` } },
-          { apellido: { [Op.iLike]: `%${q}%` } },
-          { email:    { [Op.iLike]: `%${q}%` } },
-        ],
-      },
-      attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
-      limit: 20,
-      order: [['nombre', 'ASC'], ['apellido', 'ASC']],
-    });
+    const filtroTexto = {
+      [Op.or]: [
+        { nombre:   { [Op.iLike]: `%${q}%` } },
+        { apellido: { [Op.iLike]: `%${q}%` } },
+        { email:    { [Op.iLike]: `%${q}%` } },
+      ],
+    };
 
-    const data = usuarios.map(u => ({ ...u.toJSON(), razonSocial: null }));
+    let resultados = [];
 
-    // Batch lookup de razonSocial para usuarios empresa (mismo patrón que getConversaciones)
-    const empresaIds = data.filter(u => u.rol === 'empresa').map(u => u.id);
-    if (empresaIds.length > 0) {
+    if (['alumno', 'egresado'].includes(rol)) {
+      // Ve a todos los roles habilitados para chat (alumno/egresado/empresa)
+      resultados = await Usuario.findAll({
+        where: {
+          id:     { [Op.ne]: userId },
+          activo: true,
+          rol:    { [Op.in]: ['alumno', 'egresado', 'empresa'] },
+          ...filtroTexto,
+        },
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+        limit: 20,
+        order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+      });
+    } else if (rol === 'empresa') {
+      // Resolver empresa(s) del usuario actual
+      const misEmpresaIds = await resolverEmpresasDeUsuario(userId);
+
+      // Alumnos/egresados que coinciden con la búsqueda
+      const alumnos = await Usuario.findAll({
+        where: {
+          id:     { [Op.ne]: userId },
+          activo: true,
+          rol:    { [Op.in]: ['alumno', 'egresado'] },
+          ...filtroTexto,
+        },
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+        limit: 15,
+        order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+      });
+
+      // Compañeros de empresa (misma empresa, rol empresa)
+      let companeros = [];
+      if (misEmpresaIds.size > 0) {
+        // IDs de usuarios que comparten empresa con el emisor
+        const [directos, miembros] = await Promise.all([
+          Empresa.findAll({
+            where: { id: { [Op.in]: [...misEmpresaIds] } },
+            attributes: ['usuarioId'],
+          }),
+          EmpresaUsuario.findAll({
+            where: { empresaId: { [Op.in]: [...misEmpresaIds] }, activo: true },
+            attributes: ['usuarioId'],
+          }),
+        ]);
+        const companeroIds = new Set([
+          ...directos.map(e => e.usuarioId),
+          ...miembros.map(m => m.usuarioId),
+        ]);
+        companeroIds.delete(userId); // Excluir a sí mismo
+
+        if (companeroIds.size > 0) {
+          companeros = await Usuario.findAll({
+            where: {
+              id:     { [Op.in]: [...companeroIds] },
+              activo: true,
+              ...filtroTexto,
+            },
+            attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+            limit: 5,
+            order: [['nombre', 'ASC'], ['apellido', 'ASC']],
+          });
+        }
+      }
+
+      // Fusionar sin duplicados (companeros primero, luego alumnos)
+      const vistos = new Set(companeros.map(u => u.id));
+      resultados = [...companeros, ...alumnos.filter(u => !vistos.has(u.id))].slice(0, 20);
+    }
+
+    const data = resultados.map(u => ({ ...u.toJSON(), razonSocial: null }));
+
+    // Batch lookup de razonSocial para usuarios empresa
+    const empresaUserIds = data.filter(u => u.rol === 'empresa').map(u => u.id);
+    if (empresaUserIds.length > 0) {
       const [membresias, directas] = await Promise.all([
         EmpresaUsuario.findAll({
-          where: { usuarioId: { [Op.in]: empresaIds }, activo: true },
+          where: { usuarioId: { [Op.in]: empresaUserIds }, activo: true },
           attributes: ['usuarioId'],
           include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
         }),
         Empresa.findAll({
-          where: { usuarioId: { [Op.in]: empresaIds } },
+          where: { usuarioId: { [Op.in]: empresaUserIds } },
           attributes: ['usuarioId', 'razonSocial'],
         }),
       ]);
@@ -299,14 +393,10 @@ exports.enviarMensaje = async (req, res) => {
       return res.status(404).json({ success: false, message: 'El destinatario no existe o está inactivo.' });
     }
 
-    // ── Validación de postulación activa ──────────────────────────────────────
-    // Solo se puede chatear si hay una postulación en estado que lo habilita
-    const habilitado = await tienePostulacionActiva(emisorId, Number(receptorId));
-    if (!habilitado) {
-      return res.status(403).json({
-        success: false,
-        message: 'El chat solo está disponible cuando existe una postulación activa (preseleccionado, entrevista programada o contratado).',
-      });
+    // ── Verificar permiso de chat según reglas de roles ───────────────────────
+    const { ok, motivo } = await puedeChatear(emisorId, Number(receptorId));
+    if (!ok) {
+      return res.status(403).json({ success: false, message: motivo });
     }
 
     if (!mensaje || mensaje.trim().length === 0) {
