@@ -160,6 +160,7 @@ export const empresaService = {
   getMisOfertas:         () => api.get('/empresas/mis-ofertas'),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
+  getCandidatos:         (params) => api.get('/empresas/candidatos', { params }),
   getEquipo:             () => api.get('/empresas/equipo'),
   editarMiembro:         (id, data) => api.patch(`/empresas/equipo/${id}`, data),
   resetPasswordMiembro:  (id, password) => api.patch(`/empresas/equipo/${id}/password`, { password }),

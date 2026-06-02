@@ -43,6 +43,8 @@ import CrearOfertaPage from './pages/empresa/CrearOfertaPage';
 import PostulantesMiOfertaPage from './pages/empresa/PostulantesMiOfertaPage';
 import EquipoPage from './pages/empresa/EquipoPage';
 import SeguridadPage from './pages/empresa/SeguridadPage';
+import MiEmpresaPage from './pages/empresa/MiEmpresaPage';
+import CandidatosEmpresaPage from './pages/empresa/CandidatosEmpresaPage';
 
 // Página del administrador (requiere rol admin)
 import AdminDashboardPage  from './pages/admin/AdminDashboardPage';
@@ -191,6 +193,16 @@ function AppRoutes() {
       <Route path="/empresa/seguridad" element={
         <ProtectedRoute roles={['empresa']}>
           <SeguridadPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/empresa/mi-empresa" element={
+        <ProtectedRoute roles={['empresa']}>
+          <MiEmpresaPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/empresa/candidatos" element={
+        <ProtectedRoute roles={['empresa']}>
+          <CandidatosEmpresaPage />
         </ProtectedRoute>
       } />
 

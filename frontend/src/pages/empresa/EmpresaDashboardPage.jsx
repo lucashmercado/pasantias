@@ -9,19 +9,40 @@
  * Rol: empresa
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { empresaService, ofertaService } from '../../services/api';
 import styles from './EmpresaDashboardPage.module.css';
 
-/* Configuración de tarjetas de métricas */
+/**
+ * Configuración de tarjetas de métricas.
+ * action: función que recibe { navigate, setFiltroOferta, tablaRef } y define la acción al hacer click.
+ */
 const METRIC_CARDS = [
-  { key: 'ofertasActivas',  label: 'Ofertas Activas',   icon: '📢', color: 'var(--success)' },
-  { key: 'ofertasCerradas', label: 'Ofertas Cerradas',  icon: '🔒', color: 'var(--text-muted)' },
-  { key: 'postulaciones',   label: 'Postulaciones',     icon: '📋', color: 'var(--primary)' },
-  { key: 'entrevistas',     label: 'Entrevistas',       icon: '🗓️', color: '#8e44ad' },
-  { key: 'contrataciones',  label: 'Contrataciones',    icon: '🤝', color: '#16a085' },
-  { key: 'miembrosEquipo',  label: 'Equipo Reclutador', icon: '👥', color: 'var(--secondary)' },
+  {
+    key: 'ofertasActivas',  label: 'Ofertas Activas',   icon: '📢', color: 'var(--success)',
+    action: ({ setFiltroOferta, tablaRef }) => { setFiltroOferta('activa'); tablaRef.current?.scrollIntoView({ behavior: 'smooth' }); },
+  },
+  {
+    key: 'ofertasCerradas', label: 'Ofertas Cerradas',  icon: '🔒', color: 'var(--text-muted)',
+    action: ({ setFiltroOferta, tablaRef }) => { setFiltroOferta('cerrada'); tablaRef.current?.scrollIntoView({ behavior: 'smooth' }); },
+  },
+  {
+    key: 'postulaciones',   label: 'Postulaciones',     icon: '📋', color: 'var(--primary)',
+    action: ({ navigate }) => navigate('/empresa/candidatos'),
+  },
+  {
+    key: 'entrevistas',     label: 'Entrevistas',       icon: '🗓️', color: '#8e44ad',
+    action: ({ navigate }) => navigate('/empresa/candidatos?estado=entrevista'),
+  },
+  {
+    key: 'contrataciones',  label: 'Contrataciones',    icon: '🤝', color: '#16a085',
+    action: ({ navigate }) => navigate('/empresa/candidatos?estado=contratado'),
+  },
+  {
+    key: 'miembrosEquipo',  label: 'Equipo Reclutador', icon: '👥', color: 'var(--secondary)',
+    action: ({ navigate }) => navigate('/empresa/equipo'),
+  },
 ];
 
 /* Colores de badge por estado de oferta */
@@ -33,11 +54,16 @@ const ESTADO_COLOR = {
 };
 
 export default function EmpresaDashboardPage() {
-  const [metricas,     setMetricas]     = useState(null);
-  const [ofertas,      setOfertas]      = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState('');
-  const [guardando,    setGuardando]    = useState(null); // id oferta en proceso de cambio
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tablaRef = useRef(null);
+
+  const [metricas,      setMetricas]      = useState(null);
+  const [ofertas,       setOfertas]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
+  const [guardando,     setGuardando]     = useState(null);
+  const [filtroOferta,  setFiltroOferta]  = useState(searchParams.get('filtro') ?? '');
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -106,6 +132,7 @@ export default function EmpresaDashboardPage() {
       <div className="dashboard-header">
         <h1>Panel de Empresa</h1>
         <div className={styles.headerActions}>
+          <Link to="/empresa/mi-empresa" className="btn-secondary">🏢 Editar empresa</Link>
           <Link to="/empresa/seguridad"  className="btn-secondary">🔐 Seguridad</Link>
           <Link to="/empresa/equipo"     className="btn-secondary">👥 Equipo</Link>
           <Link to="/empresa/nueva-oferta" className="btn-primary">+ Nueva Oferta</Link>
@@ -123,20 +150,41 @@ export default function EmpresaDashboardPage() {
         </div>
       ) : (
         <div className={styles.metricsGrid}>
-          {METRIC_CARDS.map(({ key, label, icon, color }) => (
-            <div key={key} className={styles.metricCard} style={{ '--card-color': color }}>
+          {METRIC_CARDS.map(({ key, label, icon, color, action }) => (
+            <button
+              key={key}
+              className={styles.metricCard}
+              style={{ '--card-color': color, cursor: 'pointer', textAlign: 'center', border: 'none', background: 'var(--card-bg, #fff)' }}
+              onClick={() => action({ navigate, setFiltroOferta, tablaRef })}
+              title={`Ver ${label.toLowerCase()}`}
+            >
               <span className={styles.metricIcon}>{icon}</span>
               <span className={styles.metricValue}>{metricas?.[key] ?? '—'}</span>
               <span className={styles.metricLabel}>{label}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
       {/* ── Tabla de ofertas propias ──────────────────────────────────────── */}
-      <div className="dashboard-header" style={{ marginTop: '2rem' }}>
+      <div className="dashboard-header" style={{ marginTop: '2rem' }} ref={tablaRef}>
         <h2 style={{ margin: 0 }}>Mis Ofertas</h2>
-        <span className={styles.totalBadge}>{ofertas.length} publicada{ofertas.length !== 1 ? 's' : ''}</span>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {filtroOferta && (
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Filtrando: <strong>{filtroOferta}</strong>
+              <button
+                style={{ marginLeft: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                onClick={() => setFiltroOferta('')}
+              >✕</button>
+            </span>
+          )}
+          <span className={styles.totalBadge}>
+            {filtroOferta
+              ? `${ofertas.filter(o => o.estado === filtroOferta).length} resultado${ofertas.filter(o => o.estado === filtroOferta).length !== 1 ? 's' : ''}`
+              : `${ofertas.length} publicada${ofertas.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
       </div>
 
       {loading ? (
@@ -163,7 +211,7 @@ export default function EmpresaDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {ofertas.map((o) => (
+              {(filtroOferta ? ofertas.filter(o => o.estado === filtroOferta) : ofertas).map((o) => (
                 <tr key={o.id} className={guardando === o.id ? styles.rowGuardando : ''}>
                   <td>
                     <strong>{o.titulo}</strong>

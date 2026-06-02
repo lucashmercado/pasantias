@@ -83,6 +83,9 @@ router.put('/mi-empresa', ...soloAdmin, ctrl.updateMiEmpresa);
 
 // ── Equipo de reclutadores ────────────────────────────────────────────────────
 
+// GET /api/empresas/candidatos?estado=X — Todas las postulaciones de la empresa (todos los miembros)
+router.get('/candidatos', ...miembro, ctrl.getAllCandidatos);
+
 // GET /api/empresas/equipo — Lista todos los miembros del equipo (todos los miembros)
 router.get('/equipo', ...miembro, ctrl.getEquipo);
 

@@ -186,17 +186,77 @@ exports.getMiEmpresa = async (req, res) => {
 
 /**
  * PUT /api/empresas/mi-empresa
- * Actualiza el perfil de la empresa. Solo propietario y gerente.
+ * Actualiza el perfil de la empresa. Solo admin_empresa.
+ *
+ * Campos editables: descripcion, rubro, sitioWeb, telefono, direccion, ciudad, logo
+ * Campos protegidos (solo lectura): razonSocial, cuit, estadoAprobacion, usuarioId, id
  */
+const CAMPOS_EDITABLES_EMPRESA = [
+  'descripcion', 'rubro', 'sitioWeb', 'telefono', 'direccion', 'ciudad', 'logo',
+];
+
 exports.updateMiEmpresa = async (req, res) => {
   try {
     const empresa = await _resolverEmpresa(req);
     if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
 
-    await empresa.update(req.body);
+    // Whitelist: solo se actualizan campos seguros; razonSocial, CUIT y estadoAprobacion son de solo lectura
+    const updateData = {};
+    for (const campo of CAMPOS_EDITABLES_EMPRESA) {
+      if (req.body[campo] !== undefined) updateData[campo] = req.body[campo];
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: 'No se enviaron campos válidos para actualizar.' });
+    }
+
+    await empresa.update(updateData);
     return res.json({ success: true, data: empresa });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error al actualizar la empresa.' });
+  }
+};
+
+// ── Candidatos de todas las ofertas de la empresa ────────────────────────────
+/**
+ * GET /api/empresas/candidatos?estado=X
+ * Devuelve todas las postulaciones de todas las ofertas de la empresa.
+ * Query param `estado` filtra por estado (opcional).
+ * Accesible para todos los miembros del equipo (admin_empresa y reclutador).
+ */
+exports.getAllCandidatos = async (req, res) => {
+  try {
+    const empresa = await _resolverEmpresa(req);
+    if (!empresa) return res.status(404).json({ success: false, message: 'No tenés empresa registrada.' });
+
+    const { estado } = req.query;
+
+    const ofertas = await Oferta.findAll({
+      where: { empresaId: empresa.id },
+      attributes: ['id'],
+    });
+    const ofertaIds = ofertas.map(o => o.id);
+
+    if (ofertaIds.length === 0) {
+      return res.json({ success: true, total: 0, data: [] });
+    }
+
+    const where = { ofertaId: { [Op.in]: ofertaIds } };
+    if (estado) where.estado = estado;
+
+    const postulaciones = await Postulacion.findAll({
+      where,
+      include: [
+        { model: Usuario, as: 'usuario', attributes: ['id', 'nombre', 'apellido', 'email', 'fotoPerfil'] },
+        { model: Oferta,  as: 'oferta',  attributes: ['id', 'titulo', 'area'] },
+      ],
+      order: [['updatedAt', 'DESC']],
+    });
+
+    return res.json({ success: true, total: postulaciones.length, data: postulaciones });
+  } catch (error) {
+    console.error('Error en getAllCandidatos:', error);
+    return res.status(500).json({ success: false, message: 'Error al obtener candidatos.' });
   }
 };
 
