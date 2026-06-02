@@ -146,18 +146,20 @@ export default function Navbar() {
         {/* Acciones del usuario */}
         <div className={styles.navbarActions}>
 
-          {/* Badge de mensajes no leídos */}
-          <Link
-            to="/chat"
-            className={`${styles.iconBadgeBtn} ${mensajesNL > 0 ? styles.iconBadgeActive : ''}`}
-            title={mensajesNL > 0 ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer` : 'Chat'}
-            aria-label="Chat"
-          >
-            💬
-            {mensajesNL > 0 && (
-              <span className={styles.iconBadgeCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
-            )}
-          </Link>
+          {/* Badge de mensajes no leídos — oculto para admin del sistema */}
+          {usuario.rol !== 'admin' && (
+            <Link
+              to="/chat"
+              className={`${styles.iconBadgeBtn} ${mensajesNL > 0 ? styles.iconBadgeActive : ''}`}
+              title={mensajesNL > 0 ? `${mensajesNL} mensaje${mensajesNL !== 1 ? 's' : ''} sin leer` : 'Chat'}
+              aria-label="Chat"
+            >
+              💬
+              {mensajesNL > 0 && (
+                <span className={styles.iconBadgeCount}>{mensajesNL > 9 ? '9+' : mensajesNL}</span>
+              )}
+            </Link>
+          )}
 
           {/* Campana de notificaciones — siempre visible; badge solo si hay sin leer */}
           <button

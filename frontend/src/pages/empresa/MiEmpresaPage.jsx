@@ -1,38 +1,105 @@
 /**
- * MiEmpresaPage.jsx — Edición del perfil de empresa.
+ * MiEmpresaPage.jsx — Visualización y edición del perfil de empresa.
  *
- * Solo accesible para admin_empresa.
+ * admin_empresa: puede ver y editar campos permitidos.
+ * reclutador:    solo lectura; campos deshabilitados y sin botón Guardar.
+ *
  * Campos editables: descripcion, rubro, sitioWeb, telefono, direccion, ciudad.
- * Campos de solo lectura: razonSocial, cuit, estadoAprobacion.
+ * Campos protegidos (solo lectura): razonSocial, cuit, estadoAprobacion.
  *
  * Ruta: /empresa/mi-empresa
  */
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { empresaService } from '../../services/api';
 
-const ESTADO_LABEL = { aprobada: '✅ Aprobada', pendiente: '⏳ Pendiente', rechazada: '❌ Rechazada' };
+const ESTADO_LABEL = {
+  aprobada:  '✅ Aprobada',
+  pendiente: '⏳ Pendiente de aprobación',
+  rechazada: '❌ Rechazada',
+};
+
+// ── Normalización de URL ──────────────────────────────────────────────────────
+// Agrega "https://" si el valor tiene aspecto de URL pero sin protocolo.
+// Devuelve cadena vacía si está vacío. Devuelve null si no parece una URL válida.
+function normalizeUrl(raw) {
+  if (!raw || !raw.trim()) return '';
+  const trimmed = raw.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    // Ya tiene protocolo; validar que sea parseable
+    try { new URL(trimmed); return trimmed; } catch { return null; }
+  }
+  // Sin protocolo: verificar que se parece a un dominio (tiene al menos un punto)
+  if (/^[\w-]+(\.[\w-]+)+/i.test(trimmed)) {
+    const withProtocol = 'https://' + trimmed;
+    try { new URL(withProtocol); return withProtocol; } catch { return null; }
+  }
+  // No parece una URL
+  return null;
+}
+
+// ── Toast de éxito ────────────────────────────────────────────────────────────
+function ToastExito({ mensaje, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3500);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div
+      role="status"
+      style={{
+        position: 'fixed',
+        top: '1.25rem',
+        right: '1.25rem',
+        zIndex: 1200,
+        background: '#16a34a',
+        color: '#fff',
+        padding: '0.75rem 1.25rem',
+        borderRadius: 10,
+        fontWeight: 600,
+        fontSize: '0.92rem',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.6rem',
+        animation: 'fadeInDown 0.25s ease',
+      }}
+    >
+      ✓ {mensaje}
+      <button
+        onClick={onClose}
+        style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
+        aria-label="Cerrar"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
 
 export default function MiEmpresaPage() {
-  const { usuario } = useAuth();
   const navigate = useNavigate();
 
-  const [empresa,   setEmpresa]   = useState(null);
-  const [form,      setForm]      = useState({});
-  const [loading,   setLoading]   = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [error,     setError]     = useState('');
-  const [success,   setSuccess]   = useState('');
+  const [empresa,    setEmpresa]    = useState(null);
+  const [rolEnEquipo, setRolEnEquipo] = useState(null); // 'admin_empresa' | 'reclutador'
+  const [form,       setForm]       = useState({});
+  const [loading,    setLoading]    = useState(true);
+  const [guardando,  setGuardando]  = useState(false);
+  const [error,      setError]      = useState('');
+  const [showToast,  setShowToast]  = useState(false);
 
-  // Determinar si es admin_empresa (puede editar) o solo lectura
-  const esAdmin = usuario?.rolInterno === 'admin_empresa' || true; // backend ya protege la escritura
+  // admin_empresa: puede editar. reclutador: solo lectura.
+  const esAdmin = rolEnEquipo === 'admin_empresa';
 
   useEffect(() => {
-    empresaService.getMiEmpresa()
-      .then(({ data }) => {
-        const e = data.data ?? data;
+    Promise.all([
+      empresaService.getMiEmpresa(),
+      empresaService.getDashboard(),
+    ])
+      .then(([empRes, dashRes]) => {
+        const e = empRes.data?.data ?? empRes.data;
         setEmpresa(e);
         setForm({
           descripcion: e.descripcion ?? '',
@@ -42,6 +109,9 @@ export default function MiEmpresaPage() {
           direccion:   e.direccion   ?? '',
           ciudad:      e.ciudad      ?? '',
         });
+        // rolEnEquipo viene del dashboard
+        const rol = dashRes.data?.data?.rolEnEquipo ?? 'admin_empresa';
+        setRolEnEquipo(rol);
       })
       .catch(() => setError('No se pudo cargar el perfil de empresa.'))
       .finally(() => setLoading(false));
@@ -55,13 +125,23 @@ export default function MiEmpresaPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
+
+    // Normalizar sitioWeb antes de enviar
+    const urlNorm = normalizeUrl(form.sitioWeb);
+    if (form.sitioWeb.trim() && urlNorm === null) {
+      setError('El sitio web no parece una URL válida. Ej: www.empresa.com o https://empresa.com');
+      return;
+    }
+
+    const payload = { ...form, sitioWeb: urlNorm || '' };
+
     setGuardando(true);
     try {
-      const { data } = await empresaService.updateMiEmpresa(form);
-      setEmpresa(data.data ?? data);
-      setSuccess('Perfil de empresa actualizado correctamente.');
-      setTimeout(() => setSuccess(''), 3000);
+      const { data } = await empresaService.updateMiEmpresa(payload);
+      const updated = data.data ?? data;
+      setEmpresa(updated);
+      setForm(prev => ({ ...prev, sitioWeb: updated.sitioWeb ?? '' }));
+      setShowToast(true);
     } catch (err) {
       setError(err.response?.data?.message ?? 'Error al guardar los cambios.');
     } finally {
@@ -73,6 +153,15 @@ export default function MiEmpresaPage() {
 
   return (
     <div className="page-container" style={{ maxWidth: 720 }}>
+
+      {/* Toast de éxito */}
+      {showToast && (
+        <ToastExito
+          mensaje="Datos de empresa actualizados correctamente."
+          onClose={() => setShowToast(false)}
+        />
+      )}
+
       <div className="dashboard-header">
         <div>
           <Link to="/empresa" className="btn-back">← Volver al panel</Link>
@@ -80,12 +169,35 @@ export default function MiEmpresaPage() {
         </div>
       </div>
 
-      {error   && <p className="error-msg">{error}</p>}
-      {success && <p className="success-msg" style={{ color: 'var(--success)', fontWeight: 600 }}>{success}</p>}
+      {error && <p className="error-msg">{error}</p>}
+
+      {/* Aviso de solo lectura para reclutadores */}
+      {!esAdmin && (
+        <div style={{
+          marginBottom: '1.25rem',
+          padding: '0.75rem 1rem',
+          background: '#fef9c3',
+          border: '1px solid #fbbf24',
+          borderRadius: 8,
+          fontSize: '0.88rem',
+          color: '#92400e',
+        }}>
+          🔒 Solo el <strong>administrador de empresa</strong> puede modificar estos datos.
+          Estás viendo el perfil en modo lectura.
+        </div>
+      )}
 
       {/* Datos de solo lectura */}
-      <section style={{ marginBottom: '2rem', padding: '1rem 1.25rem', background: 'var(--card-bg, #f8fafc)', borderRadius: 10, border: '1px solid var(--border)' }}>
-        <h3 style={{ marginTop: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>Datos institucionales (solo lectura)</h3>
+      <section style={{
+        marginBottom: '2rem',
+        padding: '1rem 1.25rem',
+        background: 'var(--card-bg, #f8fafc)',
+        borderRadius: 10,
+        border: '1px solid var(--border)',
+      }}>
+        <h3 style={{ marginTop: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+          Datos institucionales (solo lectura)
+        </h3>
         <dl style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.4rem 1rem', margin: 0, fontSize: '0.9rem' }}>
           <dt style={{ fontWeight: 600 }}>Razón Social</dt>
           <dd style={{ margin: 0 }}>{empresa?.razonSocial ?? '—'}</dd>
@@ -99,55 +211,98 @@ export default function MiEmpresaPage() {
         </p>
       </section>
 
-      {/* Formulario de edición */}
-      <form onSubmit={handleSubmit}>
+      {/* Formulario */}
+      <form onSubmit={esAdmin ? handleSubmit : (e) => e.preventDefault()}>
 
         <div className="form-group">
           <label htmlFor="rubro">Rubro / Industria</label>
-          <input id="rubro" name="rubro" type="text" value={form.rubro} onChange={handleChange}
-            placeholder="Ej: Software y Tecnología" />
+          <input
+            id="rubro" name="rubro" type="text"
+            value={form.rubro} onChange={handleChange}
+            placeholder="Ej: Software y Tecnología"
+            disabled={!esAdmin}
+          />
         </div>
 
         <div className="form-group">
           <label htmlFor="descripcion">Descripción de la empresa</label>
-          <textarea id="descripcion" name="descripcion" rows={5} value={form.descripcion} onChange={handleChange}
-            placeholder="Contanos brevemente a qué se dedica tu empresa..." />
+          <textarea
+            id="descripcion" name="descripcion" rows={5}
+            value={form.descripcion} onChange={handleChange}
+            placeholder="Contanos brevemente a qué se dedica tu empresa..."
+            disabled={!esAdmin}
+          />
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="sitioWeb">Sitio web</label>
-            <input id="sitioWeb" name="sitioWeb" type="url" value={form.sitioWeb} onChange={handleChange}
-              placeholder="https://www.empresa.com" />
+            <label htmlFor="sitioWeb">
+              Sitio web
+              {esAdmin && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 400, marginLeft: '0.4rem' }}>
+                  (ej: www.empresa.com)
+                </span>
+              )}
+            </label>
+            <input
+              id="sitioWeb" name="sitioWeb"
+              type="text"
+              value={form.sitioWeb} onChange={handleChange}
+              placeholder="www.empresa.com"
+              disabled={!esAdmin}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="telefono">Teléfono institucional</label>
-            <input id="telefono" name="telefono" type="tel" value={form.telefono} onChange={handleChange}
-              placeholder="Ej: 11-4300-1234" />
+            <input
+              id="telefono" name="telefono" type="tel"
+              value={form.telefono} onChange={handleChange}
+              placeholder="Ej: 11-4300-1234"
+              disabled={!esAdmin}
+            />
           </div>
         </div>
 
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="ciudad">Ciudad</label>
-            <input id="ciudad" name="ciudad" type="text" value={form.ciudad} onChange={handleChange}
-              placeholder="Ej: Avellaneda" />
+            <input
+              id="ciudad" name="ciudad" type="text"
+              value={form.ciudad} onChange={handleChange}
+              placeholder="Ej: Avellaneda"
+              disabled={!esAdmin}
+            />
           </div>
           <div className="form-group">
             <label htmlFor="direccion">Dirección</label>
-            <input id="direccion" name="direccion" type="text" value={form.direccion} onChange={handleChange}
-              placeholder="Ej: Av. Mitre 1234" />
+            <input
+              id="direccion" name="direccion" type="text"
+              value={form.direccion} onChange={handleChange}
+              placeholder="Ej: Av. Mitre 1234"
+              disabled={!esAdmin}
+            />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-          <button type="submit" className="btn-primary" disabled={guardando}>
-            {guardando ? 'Guardando...' : '✓ Guardar cambios'}
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
-            Cancelar
-          </button>
-        </div>
+        {/* Botones solo para admin_empresa */}
+        {esAdmin && (
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+            <button type="submit" className="btn-primary" disabled={guardando}>
+              {guardando ? 'Guardando...' : '✓ Guardar cambios'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
+              Cancelar
+            </button>
+          </div>
+        )}
+
+        {!esAdmin && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <button type="button" className="btn-secondary" onClick={() => navigate('/empresa')}>
+              ← Volver al panel
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
