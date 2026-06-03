@@ -76,8 +76,9 @@ export const postulacionService = {
 // ── Servicio de perfil de usuario ─────────────────────────────────────────────
 // Funciones para los endpoints de /api/users
 export const userService = {
-  getPerfil: () => api.get('/users/perfil'),              // Ver mi perfil
-  updatePerfil: (data) => api.put('/users/perfil', data), // Actualizar mi perfil
+  getPerfil: () => api.get('/users/perfil'),                          // Ver mi perfil
+  updatePerfil: (data) => api.put('/users/perfil', data),             // Actualizar mi perfil
+  getPerfilPublico: (usuarioId) => api.get(`/users/${usuarioId}/perfil`), // Perfil público de otro usuario
   subirCV: (formData) => api.post('/users/perfil/cv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },  // Header especial para subida de archivos
   }),
@@ -164,6 +165,7 @@ export const empresaService = {
   getDashboard:          () => api.get('/empresas/dashboard'),
   getMisOfertas:         () => api.get('/empresas/mis-ofertas'),
   getMiEmpresa:          () => api.get('/empresas/mi-empresa'),
+  getPublico:            (empresaId) => api.get(`/empresas/${empresaId}`), // Perfil público de empresa
   updateMiEmpresa:       (data) => api.put('/empresas/mi-empresa', data),
   getCandidatos:         (params) => api.get('/empresas/candidatos', { params }),
   getEquipo:             () => api.get('/empresas/equipo'),

@@ -478,25 +478,50 @@ export default function ChatPage() {
                   </strong>
                   <span>{partnerActivo?.email}</span>
                 </div>
-                {/* Ver perfil — pendiente de implementar rutas de perfil público */}
-                <button
-                  className={styles.verPerfilBtn}
-                  disabled
-                  title="Ver perfil (próximamente)"
-                  style={{
-                    marginLeft: 'auto',
-                    padding: '4px 12px',
-                    fontSize: '0.78rem',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border, #e2e8f0)',
-                    background: 'transparent',
-                    color: 'var(--text-muted, #64748b)',
-                    cursor: 'not-allowed',
-                    opacity: 0.6,
-                  }}
-                >
-                  Ver perfil
-                </button>
+                {/* Ver perfil — link a perfil público del interlocutor */}
+                {(() => {
+                  const perfilUrl = partnerActivo?.rol === 'empresa'
+                    ? (partnerActivo?.empresaId ? `/empresa/${partnerActivo.empresaId}` : null)
+                    : (partnerActivo?.id ? `/perfil/${partnerActivo.id}` : null);
+                  return perfilUrl ? (
+                    <button
+                      className={styles.verPerfilBtn}
+                      onClick={() => navigate(perfilUrl)}
+                      title="Ver perfil"
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '4px 12px',
+                        fontSize: '0.78rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border, #e2e8f0)',
+                        background: 'transparent',
+                        color: 'var(--primary, #0073AD)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Ver perfil
+                    </button>
+                  ) : (
+                    <button
+                      className={styles.verPerfilBtn}
+                      disabled
+                      title="Perfil no disponible"
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '4px 12px',
+                        fontSize: '0.78rem',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border, #e2e8f0)',
+                        background: 'transparent',
+                        color: 'var(--text-muted, #64748b)',
+                        cursor: 'not-allowed',
+                        opacity: 0.5,
+                      }}
+                    >
+                      Ver perfil
+                    </button>
+                  );
+                })()}
               </div>
 
               {/* Mensajes */}

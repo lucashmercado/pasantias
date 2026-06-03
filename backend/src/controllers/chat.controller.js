@@ -28,20 +28,29 @@ const { crearNotificacion } = require('../utils/notificador');
 const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
 
 /**
- * Resuelve la razón social de un usuario con rol 'empresa'.
+ * Resuelve razonSocial y empresaId de un usuario con rol 'empresa'.
  * 1. Busca membresía activa en empresa_usuarios (reclutadores / admin_empresa)
  * 2. Fallback: propietario directo (empresa.usuarioId)
- * Devuelve null si no aplica.
+ * Devuelve { razonSocial, empresaId } — ambos null si no aplica.
  */
-async function resolverRazonSocial(usuarioId) {
+async function resolverEmpresaData(usuarioId) {
   const membresia = await EmpresaUsuario.findOne({
     where: { usuarioId, activo: true },
     attributes: [],
-    include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+    include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
   });
-  if (membresia?.empresa?.razonSocial) return membresia.empresa.razonSocial;
-  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['razonSocial'] });
-  return empresa?.razonSocial ?? null;
+  if (membresia?.empresa?.razonSocial) {
+    return { razonSocial: membresia.empresa.razonSocial, empresaId: membresia.empresa.id };
+  }
+  const empresa = await Empresa.findOne({ where: { usuarioId }, attributes: ['id', 'razonSocial'] });
+  return empresa
+    ? { razonSocial: empresa.razonSocial, empresaId: empresa.id }
+    : { razonSocial: null, empresaId: null };
+}
+
+// Alias de compatibilidad para uso donde solo se necesita razonSocial
+async function resolverRazonSocial(usuarioId) {
+  return (await resolverEmpresaData(usuarioId)).razonSocial;
 }
 
 // ── Helper: IDs de empresa a los que pertenece un usuario ────────────────────
@@ -234,28 +243,31 @@ exports.buscarUsuarios = async (req, res) => {
       resultados = [...companeros, ...alumnos.filter(u => !vistos.has(u.id))].slice(0, 20);
     }
 
-    const data = resultados.map(u => ({ ...u.toJSON(), razonSocial: null }));
+    const data = resultados.map(u => ({ ...u.toJSON(), razonSocial: null, empresaId: null }));
 
-    // Batch lookup de razonSocial para usuarios empresa
+    // Batch lookup de razonSocial + empresaId para usuarios empresa
     const empresaUserIds = data.filter(u => u.rol === 'empresa').map(u => u.id);
     if (empresaUserIds.length > 0) {
       const [membresias, directas] = await Promise.all([
         EmpresaUsuario.findAll({
           where: { usuarioId: { [Op.in]: empresaUserIds }, activo: true },
           attributes: ['usuarioId'],
-          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
         }),
         Empresa.findAll({
           where: { usuarioId: { [Op.in]: empresaUserIds } },
-          attributes: ['usuarioId', 'razonSocial'],
+          attributes: ['id', 'usuarioId', 'razonSocial'],
         }),
       ]);
       const rsMap = {};
-      directas.forEach(e => { rsMap[e.usuarioId] = e.razonSocial; });
+      directas.forEach(e => { rsMap[e.usuarioId] = { razonSocial: e.razonSocial, empresaId: e.id }; });
       membresias.forEach(m => {
-        if (m.empresa?.razonSocial) rsMap[m.usuarioId] = m.empresa.razonSocial;
+        if (m.empresa?.razonSocial) rsMap[m.usuarioId] = { razonSocial: m.empresa.razonSocial, empresaId: m.empresa.id };
       });
-      data.forEach(u => { u.razonSocial = rsMap[u.id] ?? null; });
+      data.forEach(u => {
+        u.razonSocial = rsMap[u.id]?.razonSocial ?? null;
+        u.empresaId   = rsMap[u.id]?.empresaId   ?? null;
+      });
     }
 
     return res.json({ success: true, total: data.length, data });
@@ -318,7 +330,7 @@ exports.getConversaciones = async (req, res) => {
       noLeidos: c.noLeidos,
     }));
 
-    // Batch lookup de empresa para usuarios con rol 'empresa'
+    // Batch lookup de razonSocial + empresaId para usuarios con rol 'empresa'
     const empresaUserIds = conversaciones
       .filter(c => c.usuario.rol === 'empresa')
       .map(c => c.usuario.id);
@@ -328,23 +340,23 @@ exports.getConversaciones = async (req, res) => {
         EmpresaUsuario.findAll({
           where: { usuarioId: { [Op.in]: empresaUserIds }, activo: true },
           attributes: ['usuarioId'],
-          include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
+          include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial'] }],
         }),
         Empresa.findAll({
           where: { usuarioId: { [Op.in]: empresaUserIds } },
-          attributes: ['usuarioId', 'razonSocial'],
+          attributes: ['id', 'usuarioId', 'razonSocial'],
         }),
       ]);
 
-      const razonSocialMap = {};
-      directas.forEach(e => { razonSocialMap[e.usuarioId] = e.razonSocial; });
-      // Membresías tienen precedencia sobre propietario directo
+      const empresaMap = {};
+      directas.forEach(e => { empresaMap[e.usuarioId] = { razonSocial: e.razonSocial, empresaId: e.id }; });
       membresias.forEach(m => {
-        if (m.empresa?.razonSocial) razonSocialMap[m.usuarioId] = m.empresa.razonSocial;
+        if (m.empresa?.razonSocial) empresaMap[m.usuarioId] = { razonSocial: m.empresa.razonSocial, empresaId: m.empresa.id };
       });
 
       conversaciones.forEach(c => {
-        c.usuario.razonSocial = razonSocialMap[c.usuario.id] ?? null;
+        c.usuario.razonSocial = empresaMap[c.usuario.id]?.razonSocial ?? null;
+        c.usuario.empresaId   = empresaMap[c.usuario.id]?.empresaId   ?? null;
       });
     }
 
@@ -484,11 +496,16 @@ exports.getHistorial = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
     }
 
-    // Resolver razonSocial usando el helper existente (evita includes problemáticos)
+    // Resolver razonSocial + empresaId para usuarios empresa
     const partnerData = partner.toJSON();
-    partnerData.razonSocial = partner.rol === 'empresa'
-      ? await resolverRazonSocial(partnerId)
-      : null;
+    if (partner.rol === 'empresa') {
+      const { razonSocial, empresaId } = await resolverEmpresaData(partnerId);
+      partnerData.razonSocial = razonSocial;
+      partnerData.empresaId   = empresaId;
+    } else {
+      partnerData.razonSocial = null;
+      partnerData.empresaId   = null;
+    }
 
     const { count, rows: mensajes } = await Mensaje.findAndCountAll({
       where: {

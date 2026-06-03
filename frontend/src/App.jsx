@@ -53,6 +53,10 @@ import AdminLogsPage       from './pages/admin/AdminLogsPage';
 import AdminSolicitudesPage from './pages/admin/AdminSolicitudesPage';
 import AdminOfertasPage    from './pages/admin/AdminOfertasPage';
 
+// Páginas de perfiles públicos (alumno/egresado y empresa)
+import PerfilPublicoPage  from './pages/alumno/PerfilPublicoPage';
+import EmpresaPublicaPage from './pages/empresa/EmpresaPublicaPage';
+
 // Página de chat/mensajería (todos los roles autenticados)
 import ChatPage from './pages/ChatPage';
 
@@ -250,6 +254,20 @@ function AppRoutes() {
       <Route path="/admin/ofertas" element={
         <ProtectedRoute roles={['admin']}>
           <AdminOfertasPage />
+        </ProtectedRoute>
+      } />
+
+      {/* ── Perfiles públicos (alumno/egresado, empresa) ── */}
+      {/* /perfil/:usuarioId — vista pública de un alumno o egresado */}
+      <Route path="/perfil/:usuarioId" element={
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
+          <PerfilPublicoPage />
+        </ProtectedRoute>
+      } />
+      {/* /empresa/:empresaId — vista pública de una empresa (DESPUÉS de todas las rutas fijas /empresa/...) */}
+      <Route path="/empresa/:empresaId" element={
+        <ProtectedRoute roles={['alumno', 'egresado', 'empresa']}>
+          <EmpresaPublicaPage />
         </ProtectedRoute>
       } />
 

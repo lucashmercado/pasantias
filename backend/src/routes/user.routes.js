@@ -183,14 +183,45 @@ router.post('/perfil/carta-recomendacion', verifyToken, authorizeRoles('alumno',
 });
 
 // GET /api/users/:id/perfil — Devuelve el perfil público de un usuario
-// Accesible para cualquier usuario autenticado (ej: empresa viendo candidato)
+// Solo alumno/egresado activos. Respeta visibilidadPerfil (BOOLEAN en DB).
+// Excluye campos sensibles: salarioPretendido, preferenciasLaborales, redesSociales, cartaRecomendacion.
 router.get('/:id/perfil', verifyToken, async (req, res) => {
-  const usuario = await Usuario.findByPk(req.params.id, {
-    attributes: ['id', 'nombre', 'apellido'],
-    include: [{ model: Perfil, as: 'perfil' }],
-  });
-  if (!usuario) return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
-  return res.json({ success: true, data: usuario });
+  try {
+    const usuario = await Usuario.findOne({
+      where: { id: req.params.id, activo: true },
+      attributes: ['id', 'nombre', 'apellido', 'rol', 'fotoPerfil', 'ubicacion'],
+    });
+    if (!usuario || !['alumno', 'egresado'].includes(usuario.rol)) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+    }
+
+    const perfil = await Perfil.findOne({
+      where: { usuarioId: req.params.id },
+      attributes: [
+        'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
+        'certificaciones', 'linkedin', 'github', 'portfolio', 'cvPath',
+        'areaInteres', 'disponibilidad', 'experienciaLaboral', 'proyectos',
+        'visibilidadPerfil',
+      ],
+    });
+
+    // visibilidadPerfil es BOOLEAN: false → privado → 403
+    if (perfil && perfil.visibilidadPerfil === false) {
+      return res.status(403).json({ success: false, message: 'Este perfil es privado.', code: 'PERFIL_PRIVADO' });
+    }
+
+    const { visibilidadPerfil, ...perfilPublico } = perfil ? perfil.toJSON() : {};
+    return res.json({
+      success: true,
+      data: {
+        ...usuario.toJSON(),
+        perfil: perfil ? perfilPublico : null,
+      },
+    });
+  } catch (err) {
+    console.error('[GET /:id/perfil]', err.message);
+    return res.status(500).json({ success: false, message: 'Error al obtener el perfil.' });
+  }
 });
 
 module.exports = router;

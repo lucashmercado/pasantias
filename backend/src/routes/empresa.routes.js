@@ -54,6 +54,7 @@ const router = require('express').Router();
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const { verifyEmpresaMember, authorizeEmpresaRoles } = require('../middleware/empresa.middleware');
 const ctrl = require('../controllers/empresa.controller');
+const { Empresa, Oferta } = require('../models');
 
 // Shorthand: token JWT + resolver empresa + rol en equipo
 const miembro    = [verifyToken, verifyEmpresaMember];
@@ -108,5 +109,33 @@ router.patch('/equipo/:id', ...soloAdmin, ctrl.updateMiembro);
 
 // DELETE /api/empresas/equipo/:id — Da de baja un miembro (solo admin_empresa)
 router.delete('/equipo/:id', ...soloAdmin, ctrl.removeMiembro);
+
+// ── Perfil público de empresa ─────────────────────────────────────────────────
+// ⚠️ DEBE ir al final — la ruta /:id captura cualquier path si va antes de los fijos
+// GET /api/empresas/:id — Solo empresas aprobadas; incluye últimas 10 ofertas activas
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const empresa = await Empresa.findOne({
+      where: { id: req.params.id, estadoAprobacion: 'aprobada' },
+      attributes: ['id', 'razonSocial', 'rubro', 'descripcion', 'ciudad',
+                   'direccion', 'telefono', 'sitioWeb', 'logo', 'usuarioId'],
+    });
+    if (!empresa) {
+      return res.status(404).json({ success: false, message: 'Empresa no encontrada o no disponible.' });
+    }
+
+    const ofertas = await Oferta.findAll({
+      where: { empresaId: empresa.id, estado: 'activa' },
+      attributes: ['id', 'titulo', 'area', 'modalidad', 'ciudad', 'fechaLimite', 'tipoPuesto'],
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+    });
+
+    return res.json({ success: true, data: { ...empresa.toJSON(), ofertas } });
+  } catch (err) {
+    console.error('[GET /empresas/:id]', err.message);
+    return res.status(500).json({ success: false, message: 'Error al obtener la empresa.' });
+  }
+});
 
 module.exports = router;

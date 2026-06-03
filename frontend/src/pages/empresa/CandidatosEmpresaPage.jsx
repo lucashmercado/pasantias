@@ -128,7 +128,13 @@ export default function CandidatosEmpresaPage() {
               {candidatos.map(p => (
                 <tr key={p.id}>
                   <td>
-                    <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                    {p.usuario?.id ? (
+                      <Link to={`/perfil/${p.usuario.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                      </Link>
+                    ) : (
+                      <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>
+                    )}
                   </td>
                   <td style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>{p.usuario?.email}</td>
                   <td>

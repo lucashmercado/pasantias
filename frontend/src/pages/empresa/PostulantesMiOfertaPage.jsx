@@ -245,6 +245,22 @@ export default function PostulantesMiOfertaPage() {
                                 💬 Contactar
                               </button>
                             )}
+                            {p.usuario?.id && (
+                              <button
+                                onClick={() => navigate(`/perfil/${p.usuario.id}`)}
+                                title="Ver perfil del candidato"
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                  background: '#f1f5f9', color: '#475569',
+                                  border: '1px solid #cbd5e1', borderRadius: '20px',
+                                  padding: '2px 10px', fontSize: '0.75rem',
+                                  fontWeight: 600, cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                👤 Ver perfil
+                              </button>
+                            )}
                           </div>
                           <span>{p.usuario?.email}</span>
                           {perfil.carrera && <span className={styles.carrera}>{perfil.carrera}</span>}

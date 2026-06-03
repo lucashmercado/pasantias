@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ofertaService, postulacionService } from '../../services/api';
 
 const TIPO_PUESTO_CONFIG = {
@@ -46,7 +46,15 @@ export default function OfertaDetallePage() {
     <div className="page-container detalle-container">
       <button onClick={() => navigate(-1)} className="btn-back">← Volver</button>
       <h1>{oferta.titulo}</h1>
-      <h2 className="empresa-nombre">{oferta.empresa?.razonSocial}</h2>
+      <h2 className="empresa-nombre">
+        {oferta.empresaId ? (
+          <Link to={`/empresa/${oferta.empresaId}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+            {oferta.empresa?.razonSocial}
+          </Link>
+        ) : (
+          oferta.empresa?.razonSocial
+        )}
+      </h2>
 
       {/* ── Meta principal ──────────────────────────────────────────────── */}
       <div className="oferta-meta">

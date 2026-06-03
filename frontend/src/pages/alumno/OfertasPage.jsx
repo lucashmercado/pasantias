@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ofertaService } from '../../services/api';
 import styles from './OfertasPage.module.css';
 
@@ -30,7 +30,19 @@ function OfertaCard({ oferta }) {
         <span className={styles.matchPill}>⭐ {oferta.matchScore}% match</span>
       )}
       <h3 className={styles.cardTitle}>{oferta.titulo}</h3>
-      <p className={styles.cardEmpresa}>{oferta.empresa?.razonSocial}</p>
+      <p className={styles.cardEmpresa}>
+        {oferta.empresaId ? (
+          <Link
+            to={`/empresa/${oferta.empresaId}`}
+            style={{ color: 'inherit', textDecoration: 'none' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {oferta.empresa?.razonSocial}
+          </Link>
+        ) : (
+          oferta.empresa?.razonSocial
+        )}
+      </p>
       <div className={styles.cardMeta}>
         {oferta.ciudad     && <span>📍 {oferta.ciudad}</span>}
         {oferta.modalidad  && <span>💼 {oferta.modalidad}</span>}
