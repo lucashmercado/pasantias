@@ -415,40 +415,121 @@ router.patch('/empresas/:id/rechazar', ...soloAdmin, async (req, res) => {
 
 // ── Moderación de ofertas ─────────────────────────────────────────────────────
 
+/**
+ * GET /api/admin/ofertas/pendientes
+ * Ofertas que aún no fueron revisadas por el admin (moderada=false).
+ */
 router.get('/ofertas/pendientes', ...soloAdmin, async (req, res) => {
-  const ofertas = await Oferta.findAll({
-    where: { moderada: false },
-    include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial'] }],
-  });
-  return res.json({ success: true, data: ofertas });
+  try {
+    const ofertas = await Oferta.findAll({
+      where: { moderada: false },
+      include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'rubro'] }],
+      order: [['createdAt', 'ASC']],
+    });
+    return res.json({ success: true, data: ofertas });
+  } catch (err) {
+    console.error('[Admin] Error en GET /ofertas/pendientes:', err);
+    return res.status(500).json({ success: false, message: 'Error al obtener ofertas pendientes.' });
+  }
 });
 
-router.patch('/ofertas/:id/moderar', ...soloAdmin, async (req, res) => {
-  const { aprobada } = req.body;
-  const oferta = await Oferta.findByPk(req.params.id);
-  if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
-  await oferta.update({ moderada: aprobada, estado: aprobada ? 'activa' : 'cerrada' });
-  await logAction({ usuarioId: req.usuario.id, accion: aprobada ? 'aprobar_oferta' : 'rechazar_oferta', entidad: 'oferta', entidadId: oferta.id, detalle: { titulo: oferta.titulo }, ip: req.ip });
-
-  // Notificar a la empresa que su oferta fue aprobada o rechazada
+/**
+ * GET /api/admin/ofertas
+ * Todas las ofertas con filtro opcional por estado.
+ * Query param: estado (activa | pausada | rechazada | cerrada)
+ */
+router.get('/ofertas', ...soloAdmin, async (req, res) => {
   try {
-    const empresaOferta = await Empresa.findByPk(oferta.empresaId, { attributes: ['usuarioId'] });
-    if (empresaOferta?.usuarioId) {
-      await crearNotificacion({
-        usuarioId: empresaOferta.usuarioId,
-        titulo: aprobada ? '✅ Tu oferta fue aprobada' : '❌ Tu oferta fue rechazada',
-        mensaje: aprobada
-          ? `La oferta "${oferta.titulo}" fue aprobada y ya está publicada.`
-          : `La oferta "${oferta.titulo}" fue rechazada por el administrador.`,
-        tipo: 'oferta',
-        tipoVisual: aprobada ? 'success' : 'error',
-        enlace: '/empresa',
-        accionURL: '/empresa',
-      });
-    }
-  } catch (e) { console.error('[Admin] Error notif moderación oferta:', e.message); }
+    const { estado } = req.query;
+    const where = {};
+    if (estado) where.estado = estado;
 
-  return res.json({ success: true, message: aprobada ? 'Oferta aprobada.' : 'Oferta rechazada.' });
+    const ofertas = await Oferta.findAll({
+      where,
+      include: [{ model: Empresa, as: 'empresa', attributes: ['razonSocial', 'rubro'] }],
+      order: [['createdAt', 'DESC']],
+    });
+    return res.json({ success: true, total: ofertas.length, data: ofertas });
+  } catch (err) {
+    console.error('[Admin] Error en GET /ofertas:', err);
+    return res.status(500).json({ success: false, message: 'Error al obtener las ofertas.' });
+  }
+});
+
+/**
+ * PATCH /api/admin/ofertas/:id/moderar
+ * Acciones de moderación sobre una oferta.
+ *
+ * Body: { accion: 'aprobar' | 'pausar' | 'rechazar' | 'cerrar' }
+ * Legacy compatible: { aprobada: true | false }
+ *
+ * Siempre setea moderada=true al revisar.
+ * Notifica a la empresa en pausa/rechazo/cierre.
+ */
+router.patch('/ofertas/:id/moderar', ...soloAdmin, async (req, res) => {
+  try {
+    const oferta = await Oferta.findByPk(req.params.id);
+    if (!oferta) return res.status(404).json({ success: false, message: 'Oferta no encontrada.' });
+
+    // Resolver acción — soporta nuevo `accion` y legacy `aprobada`
+    let accion = req.body.accion;
+    if (!accion && req.body.aprobada !== undefined) {
+      accion = req.body.aprobada ? 'aprobar' : 'rechazar';
+    }
+
+    const ACCIONES_VALIDAS = ['aprobar', 'pausar', 'rechazar', 'cerrar'];
+    if (!ACCIONES_VALIDAS.includes(accion)) {
+      return res.status(400).json({ success: false, message: `accion inválida. Válidas: ${ACCIONES_VALIDAS.join(', ')}.` });
+    }
+
+    const ESTADO_POR_ACCION = {
+      aprobar:  'activa',
+      pausar:   'pausada',
+      rechazar: 'rechazada',
+      cerrar:   'cerrada',
+    };
+
+    const nuevoEstado = ESTADO_POR_ACCION[accion];
+    await oferta.update({ moderada: true, estado: nuevoEstado });
+
+    await logAction({
+      usuarioId: req.usuario.id,
+      accion: `${accion}_oferta`,
+      entidad: 'oferta',
+      entidadId: oferta.id,
+      detalle: { titulo: oferta.titulo, nuevoEstado },
+      ip: req.ip,
+    });
+
+    // Notificar a la empresa según la acción
+    const notifPorAccion = {
+      aprobar:  { titulo: '✅ Tu oferta fue aprobada',  mensaje: `La oferta "${oferta.titulo}" fue aprobada y está publicada.`,                        tipoVisual: 'success' },
+      pausar:   { titulo: '⏸️ Tu oferta fue pausada',   mensaje: `La oferta "${oferta.titulo}" fue pausada por el administrador.`,                     tipoVisual: 'warning' },
+      rechazar: { titulo: '❌ Tu oferta fue rechazada', mensaje: `La oferta "${oferta.titulo}" fue rechazada por el administrador.`,                    tipoVisual: 'error'   },
+      cerrar:   { titulo: '🔒 Tu oferta fue cerrada',   mensaje: `La oferta "${oferta.titulo}" fue cerrada por el administrador.`,                      tipoVisual: 'info'    },
+    };
+
+    try {
+      const empresaOferta = await Empresa.findByPk(oferta.empresaId, { attributes: ['usuarioId'] });
+      if (empresaOferta?.usuarioId) {
+        const notif = notifPorAccion[accion];
+        await crearNotificacion({
+          usuarioId: empresaOferta.usuarioId,
+          titulo: notif.titulo,
+          mensaje: notif.mensaje,
+          tipo: 'oferta',
+          tipoVisual: notif.tipoVisual,
+          enlace: '/empresa',
+          accionURL: '/empresa',
+        });
+      }
+    } catch (e) { console.error('[Admin] Error notif moderación oferta:', e.message); }
+
+    return res.json({ success: true, message: `Oferta ${accion === 'aprobar' ? 'aprobada' : accion === 'pausar' ? 'pausada' : accion === 'rechazar' ? 'rechazada' : 'cerrada'}.`, data: { estado: nuevoEstado, moderada: true } });
+  } catch (err) {
+    console.error('[Admin] Error en PATCH /ofertas/:id/moderar:', err);
+    return res.status(500).json({ success: false, message: 'Error al moderar la oferta.' });
+  }
 });
 
 // ── Logs del sistema (v1.4) ───────────────────────────────────────────────────

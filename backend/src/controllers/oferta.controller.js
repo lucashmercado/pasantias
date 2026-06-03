@@ -19,6 +19,7 @@
 
 const { Oferta, Empresa, Usuario, Perfil, Postulacion } = require('../models');
 const { Op } = require('sequelize');
+const { crearNotificacion } = require('../utils/notificador');
 
 const TIPOS_PUESTO_VALIDOS = ['pasante', 'trainee', 'junior'];
 const CARRERAS_VALIDAS = require('../data/catalogos.json').carreras;
@@ -99,8 +100,8 @@ exports.getOfertas = async (req, res) => {
   try {
     const { area, modalidad, ciudad, experiencia, tipoPuesto, q } = req.query;
 
-    // Solo se muestran ofertas activas y ya aprobadas por el admin
-    const where = { estado: 'activa', moderada: true };
+    // Solo se muestran ofertas activas (alumnos ven aunque moderada=false)
+    const where = { estado: 'activa' };
 
     if (area)       where.area = { [Op.iLike]: `%${area}%` };
     if (modalidad)  where.modalidad = modalidad;
@@ -155,8 +156,8 @@ exports.getOfertasRecomendadas = async (req, res) => {
     // Obtiene el perfil del alumno para extraer sus preferencias
     const perfil = await Perfil.findOne({ where: { usuarioId } });
 
-    // Base: solo ofertas activas y aprobadas
-    const where = { estado: 'activa', moderada: true };
+    // Base: solo ofertas activas (alumnos ven aunque moderada=false)
+    const where = { estado: 'activa' };
 
     // Excluye ofertas a las que el alumno ya se postuló
     const postuladas = await Postulacion.findAll({
@@ -271,6 +272,23 @@ exports.createOferta = async (req, res) => {
       empresaId: empresa.id,
       moderada: false,
     });
+
+    // Notificar a todos los admins para que moderen la nueva oferta
+    try {
+      const admins = await Usuario.findAll({ where: { rol: 'admin', activo: true }, attributes: ['id'] });
+      await Promise.all(admins.map((admin) =>
+        crearNotificacion({
+          usuarioId: admin.id,
+          titulo: '📋 Nueva oferta pendiente de moderación',
+          mensaje: `La empresa "${empresa.razonSocial}" publicó "${oferta.titulo}". Revisala en el panel de ofertas.`,
+          tipo: 'oferta',
+          tipoVisual: 'info',
+          enlace: '/admin/ofertas',
+          accionURL: '/admin/ofertas',
+        })
+      ));
+    } catch (e) { console.error('[Oferta] Error notif admin moderación:', e.message); }
+
     return res.status(201).json({ success: true, message: 'Oferta creada. Pendiente de moderación.', data: oferta });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Error al crear la oferta.' });

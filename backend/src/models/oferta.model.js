@@ -127,9 +127,10 @@ module.exports = (sequelize) => {
     // ── Estado y moderación ───────────────────────────────────────────────
 
     // Estado actual de la oferta
-    // 'activa' → recibe postulaciones | 'pausada' → inactiva temporalmente | 'cerrada' → finalizada
+    // 'activa' → recibe postulaciones | 'pausada' → inactiva temporalmente
+    // 'rechazada' → rechazada por el admin | 'cerrada' → finalizada
     estado: {
-      type: DataTypes.ENUM('activa', 'pausada', 'cerrada'),
+      type: DataTypes.ENUM('activa', 'pausada', 'rechazada', 'cerrada'),
       defaultValue: 'activa',
     },
 

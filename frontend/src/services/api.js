@@ -111,7 +111,12 @@ export const adminService = {
 
   // Moderación de ofertas
   getOfertasPendientes:  () => api.get('/admin/ofertas/pendientes'),
-  moderarOferta:         (id, aprobada) => api.patch(`/admin/ofertas/${id}/moderar`, { aprobada }),
+  getTodasOfertas:       (params) => api.get('/admin/ofertas', { params }),
+  // accion: 'aprobar' | 'pausar' | 'rechazar' | 'cerrar'  (o legacy aprobada: bool)
+  moderarOferta:         (id, accion) => {
+    const body = typeof accion === 'boolean' ? { aprobada: accion } : { accion };
+    return api.patch(`/admin/ofertas/${id}/moderar`, body);
+  },
 
   // CRUD de usuarios (v1.4)
   getUsuarios:           (params) => api.get('/admin/usuarios', { params }),

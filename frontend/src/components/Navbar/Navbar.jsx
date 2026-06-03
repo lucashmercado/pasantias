@@ -86,6 +86,7 @@ export default function Navbar() {
   const linksAdmin = [
     { to: '/admin', label: 'Dashboard' },
     { to: '/admin/solicitudes', label: '📋 Solicitudes' },
+    { to: '/admin/ofertas', label: '📣 Ofertas' },
     { to: '/admin/usuarios', label: '👥 Usuarios' },
     { to: '/admin/logs', label: 'Historial de Accesos' },
   ];

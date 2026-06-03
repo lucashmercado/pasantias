@@ -51,6 +51,7 @@ import AdminDashboardPage  from './pages/admin/AdminDashboardPage';
 import AdminUsuariosPage   from './pages/admin/AdminUsuariosPage';
 import AdminLogsPage       from './pages/admin/AdminLogsPage';
 import AdminSolicitudesPage from './pages/admin/AdminSolicitudesPage';
+import AdminOfertasPage    from './pages/admin/AdminOfertasPage';
 
 // Página de chat/mensajería (todos los roles autenticados)
 import ChatPage from './pages/ChatPage';
@@ -244,6 +245,11 @@ function AppRoutes() {
       <Route path="/admin/solicitudes" element={
         <ProtectedRoute roles={['admin']}>
           <AdminSolicitudesPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/ofertas" element={
+        <ProtectedRoute roles={['admin']}>
+          <AdminOfertasPage />
         </ProtectedRoute>
       } />
 

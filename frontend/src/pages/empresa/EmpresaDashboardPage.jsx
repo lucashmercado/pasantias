@@ -47,10 +47,18 @@ const METRIC_CARDS = [
 
 /* Colores de badge por estado de oferta */
 const ESTADO_COLOR = {
-  activa:   '#27ae60',
-  pausada:  '#e67e22',
-  cerrada:  '#7f8c8d',
-  pendiente:'#3498db',
+  activa:    '#27ae60',
+  pausada:   '#e67e22',
+  rechazada: '#e74c3c',
+  cerrada:   '#7f8c8d',
+  pendiente: '#3498db',
+};
+
+const ESTADO_LABEL = {
+  activa:    'Activa',
+  pausada:   'Pausada',
+  rechazada: 'Rechazada',
+  cerrada:   'Cerrada',
 };
 
 export default function EmpresaDashboardPage() {
@@ -230,8 +238,9 @@ export default function EmpresaDashboardPage() {
                     <span
                       className="badge"
                       style={{ background: ESTADO_COLOR[o.estado] ?? '#7f8c8d' }}
+                      title={o.estado === 'rechazada' ? 'Esta oferta fue rechazada por el administrador.' : undefined}
                     >
-                      {o.estado}
+                      {ESTADO_LABEL[o.estado] ?? o.estado}
                     </span>
                   </td>
                   <td className={styles.centrado}>{o.cantidadVacantes ?? '—'}</td>
@@ -273,6 +282,19 @@ export default function EmpresaDashboardPage() {
                           >
                             Activar
                           </button>
+                        )}
+                        {o.estado === 'rechazada' && (
+                          <span
+                            style={{ fontSize: '0.8rem', color: '#e74c3c', fontStyle: 'italic' }}
+                            title="Contactá al administrador para más información."
+                          >
+                            Revisada por admin
+                          </span>
+                        )}
+                        {o.estado === 'cerrada' && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            —
+                          </span>
                         )}
                       </>
                     )}
