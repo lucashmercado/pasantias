@@ -264,10 +264,15 @@ function MiembroCard({ miembro, esPropietario, onToggleActivo }) {
   const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim() || u.email;
   const inicial = nombre[0]?.toUpperCase() ?? '?';
   const esProp = miembro.rolInterno === 'admin_empresa';
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className={`${styles.miembroCard} ${!miembro.activo ? styles.miembroInactivo : ''}`}>
-      <div className={styles.cardAvatar} style={{ background: rolColor(miembro.rolInterno) }}>{inicial}</div>
+      <div className={styles.cardAvatar} style={{ background: rolColor(miembro.rolInterno) }}>
+        {u.fotoPerfil && !imgError
+          ? <img src={u.fotoPerfil} alt={nombre} onError={() => setImgError(true)} className={styles.avatarImg} />
+          : inicial}
+      </div>
       <div className={styles.cardInfo}>
         <div className={styles.cardNombre}>
           <strong>{nombre}</strong>
@@ -335,13 +340,19 @@ export default function EquipoPage() {
   useEffect(() => {
     async function cargar() {
       try {
-        const [equipoRes, solRes] = await Promise.all([
-          empresaService.getEquipo(),
-          empresaService.getMisSolicitudesReclutador(),
-        ]);
+        const equipoRes = await empresaService.getEquipo();
+        const rolRecibido = equipoRes.data.rolEnEquipo ?? null;
         setEquipo(equipoRes.data.data ?? []);
-        if (equipoRes.data.rolEnEquipo) setRolEnEquipo(equipoRes.data.rolEnEquipo);
-        setSolicitudes(solRes.data.data ?? []);
+        setRolEnEquipo(rolRecibido);
+
+        if (rolRecibido === 'admin_empresa') {
+          try {
+            const solRes = await empresaService.getMisSolicitudesReclutador();
+            setSolicitudes(solRes.data.data ?? []);
+          } catch {
+            // las solicitudes son UI secundaria; no bloquear si fallan
+          }
+        }
       } catch {
         setError('No se pudo cargar el equipo. Intentá de nuevo.');
       } finally {
