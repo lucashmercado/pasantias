@@ -16,76 +16,18 @@
 
 const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
-const { Notificacion } = require('../models');
-const { Op } = require('sequelize');
+const {
+  getNotificaciones,
+  getSinLeerCount,
+  leerTodas,
+  leerUna,
+  eliminarNotificacion,
+} = require('../controllers/notificacion.controller');
 
-// ── GET / — Lista las últimas 50 notificaciones del usuario autenticado ────────
-router.get('/', verifyToken, async (req, res) => {
-  try {
-    const notificaciones = await Notificacion.findAll({
-      where: { usuarioId: req.usuario.id },
-      order: [
-        ['leida', 'ASC'],         // No leídas primero
-        ['createdAt', 'DESC'],    // Más recientes primero dentro de cada grupo
-      ],
-      limit: 50,
-    });
-    const sinLeer = notificaciones.filter((n) => !n.leida).length;
-    return res.json({ success: true, sinLeer, total: notificaciones.length, data: notificaciones });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Error al obtener notificaciones.' });
-  }
-});
-
-// ── GET /sin-leer-count — Solo el conteo (para polling liviano del badge) ─────
-router.get('/sin-leer-count', verifyToken, async (req, res) => {
-  try {
-    const count = await Notificacion.count({
-      where: { usuarioId: req.usuario.id, leida: false },
-    });
-    return res.json({ success: true, count });
-  } catch {
-    return res.json({ success: true, count: 0 });
-  }
-});
-
-// ── PATCH /leer-todas — Marca TODAS las notificaciones del usuario como leídas ─
-// ⚠️ DEBE ir ANTES de /:id/leer para que Express no confunda "leer-todas" con un id
-router.patch('/leer-todas', verifyToken, async (req, res) => {
-  try {
-    await Notificacion.update(
-      { leida: true },
-      { where: { usuarioId: req.usuario.id, leida: false } }
-    );
-    return res.json({ success: true, message: 'Todas las notificaciones marcadas como leídas.' });
-  } catch {
-    return res.status(500).json({ success: false, message: 'Error al marcar notificaciones.' });
-  }
-});
-
-// ── PATCH /:id/leer — Marca una notificación específica como leída ────────────
-router.patch('/:id/leer', verifyToken, async (req, res) => {
-  try {
-    await Notificacion.update(
-      { leida: true },
-      { where: { id: req.params.id, usuarioId: req.usuario.id } }
-    );
-    return res.json({ success: true, message: 'Notificación marcada como leída.' });
-  } catch {
-    return res.status(500).json({ success: false, message: 'Error al marcar la notificación.' });
-  }
-});
-
-// ── DELETE /:id — Elimina una notificación propia ─────────────────────────────
-router.delete('/:id', verifyToken, async (req, res) => {
-  try {
-    await Notificacion.destroy({
-      where: { id: req.params.id, usuarioId: req.usuario.id },
-    });
-    return res.json({ success: true, message: 'Notificación eliminada.' });
-  } catch {
-    return res.status(500).json({ success: false, message: 'Error al eliminar la notificación.' });
-  }
-});
+router.get('/',                verifyToken, getNotificaciones);
+router.get('/sin-leer-count',  verifyToken, getSinLeerCount);
+router.patch('/leer-todas',    verifyToken, leerTodas);
+router.patch('/:id/leer',      verifyToken, leerUna);
+router.delete('/:id',          verifyToken, eliminarNotificacion);
 
 module.exports = router;

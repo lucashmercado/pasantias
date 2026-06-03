@@ -21,7 +21,6 @@
 
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const { verifyToken, authorizeRoles } = require('../middleware/auth.middleware');
 const {
   Usuario, Empresa, Oferta, Postulacion, Notificacion, ActivityLog,
@@ -31,27 +30,8 @@ const {
 const { sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
-
-// ── Helper: envío de email (reutilizable) ─────────────────────────────────────
-async function enviarEmail({ to, subject, html }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email DEV] Para: ${to} | Asunto: ${subject}`);
-    return;
-  }
-  const nodemailer = require('nodemailer');
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: false,
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-  });
-  await transporter.sendMail({
-    from: `"SisPasantías" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-  });
-}
+const solicitudEmpresaService    = require('../services/solicitudEmpresa.service');
+const solicitudReclutadorService = require('../services/solicitudReclutador.service');
 
 // Shorthand para no repetir los middlewares en cada ruta
 const soloAdmin = [verifyToken, authorizeRoles('admin')];
@@ -659,232 +639,44 @@ router.get('/solicitudes-empresa', ...soloAdmin, async (req, res) => {
   }
 });
 
-/**
- * PATCH /api/admin/solicitudes-empresa/:id/aprobar
- *
- * Cuando el administrador aprueba una solicitud:
- *  1. Pre-valida que el email de login (responsableEmail || email) no esté registrado
- *  2. Genera credenciales automáticas para el usuario admin_empresa
- *  3. Crea el Usuario con rol 'empresa' usando datos del responsable
- *  4. Crea la Empresa vinculada al usuario
- *  5. Registra al usuario como 'admin_empresa' del equipo (EmpresaUsuario)
- *  5b. Convierte reclutadores iniciales en SolicitudReclutador pendientes
- *  6. Actualiza estado de la solicitud a "aprobado"
- *  7. Envía credenciales por email al responsable
- */
 router.patch('/solicitudes-empresa/:id/aprobar', ...soloAdmin, async (req, res) => {
   try {
-    // ── 0. Buscar la solicitud (fuera de transacción para el pre-check) ────────
-    const solicitud = await SolicitudEmpresa.findByPk(req.params.id);
-    if (!solicitud) {
-      return res.status(404).json({ success: false, message: 'Solicitud no encontrada.' });
-    }
-    if (solicitud.estado !== 'pendiente') {
-      return res.status(400).json({ success: false, message: `La solicitud ya fue ${solicitud.estado}.` });
-    }
-
-    // ── 1. Pre-validar email de login antes de abrir transacción ──────────────
-    // El email de login es responsableEmail si existe; si no (solicitudes antiguas), el email institucional
-    const loginEmail = solicitud.responsableEmail || solicitud.email;
-    const emailExistente = await Usuario.findOne({ where: { email: loginEmail } });
-    if (emailExistente) {
-      return res.status(400).json({
-        success: false,
-        message: `Ya existe una cuenta registrada con el email ${loginEmail}. Usá otro email para el responsable o verificá si la empresa ya fue aprobada.`,
-        code: 'EMAIL_DUPLICADO',
-      });
-    }
-
-    // ── Abrir transacción ─────────────────────────────────────────────────────
-    const t = await sequelize.transaction();
-    try {
-      // ── 2. Generar credenciales ─────────────────────────────────────────────
-      const passwordPlano = crypto.randomBytes(6).toString('hex');
-      const hash = await bcrypt.hash(passwordPlano, 12);
-
-      // ── 3. Crear usuario admin_empresa con datos del responsable ────────────
-      // Fallbacks para solicitudes anteriores a Etapa 3 que no tienen responsable separado
-      const nuevoUsuario = await Usuario.create({
-        nombre:    solicitud.responsableNombre   || solicitud.razonSocial,
-        apellido:  solicitud.responsableApellido || 'Empresa',
-        email:     loginEmail,
-        password:  hash,
-        rol:       'empresa',
-        telefono:  solicitud.responsableTelefono || solicitud.telefono || null,
-        ubicacion: solicitud.ciudad || null,
-        activo:    true,
-        habilitado: true,
-      }, { transaction: t });
-
-      // ── 4. Crear la Empresa ─────────────────────────────────────────────────
-      const nuevaEmpresa = await Empresa.create({
-        usuarioId:        nuevoUsuario.id,
-        razonSocial:      solicitud.razonSocial,
-        cuit:             solicitud.cuit,
-        rubro:            solicitud.rubro,
-        sitioWeb:         solicitud.sitioWeb   || null,
-        direccion:        solicitud.direccion  || null,
-        ciudad:           solicitud.ciudad     || null,
-        telefono:         solicitud.telefono   || null,
-        descripcion:      solicitud.descripcion || null,
-        estadoAprobacion: 'aprobada',
-      }, { transaction: t });
-
-      // ── 5. Registrar al usuario como admin_empresa del equipo ───────────────
-      await EmpresaUsuario.create({
-        empresaId:  nuevaEmpresa.id,
-        usuarioId:  nuevoUsuario.id,
-        rolInterno: 'admin_empresa',
-        activo:     true,
-      }, { transaction: t });
-
-      // ── 5b. Convertir reclutadores iniciales en SolicitudReclutador ─────────
-      // Se crean como pendientes para que el admin las apruebe individualmente
-      const reclutadoresSolicitud = Array.isArray(solicitud.reclutadores)
-        ? solicitud.reclutadores.filter(r => r?.nombre?.trim() && r?.email?.trim())
-        : [];
-
-      if (reclutadoresSolicitud.length > 0) {
-        await SolicitudReclutador.bulkCreate(
-          reclutadoresSolicitud.map(r => ({
-            empresaId: nuevaEmpresa.id,
-            nombre:    r.nombre.trim(),
-            apellido:  r.apellido?.trim() || null,
-            email:     r.email.trim().toLowerCase(),
-            estado:    'pendiente',
-          })),
-          { transaction: t }
-        );
-      }
-
-      // ── 6. Actualizar estado de la solicitud ────────────────────────────────
-      await solicitud.update({ estado: 'aprobado' }, { transaction: t });
-
-      await t.commit();
-
-      // ── 7. Auditoría ────────────────────────────────────────────────────────
-      await logAction({
-        usuarioId: req.usuario.id,
-        accion:    'aprobar_solicitud_empresa',
-        entidad:   'solicitud_empresa',
-        entidadId: solicitud.id,
-        detalle:   {
-          razonSocial: solicitud.razonSocial,
-          emailLogin:  loginEmail,
-          empresaId:   nuevaEmpresa.id,
-          reclutadoresCreados: reclutadoresSolicitud.length,
-        },
-        ip: req.ip,
-      });
-
-      // ── 8. Enviar email con credenciales al responsable ─────────────────────
-      try {
-        const nombreResponsable = solicitud.responsableNombre || solicitud.razonSocial;
-        const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
-        await enviarEmail({
-          to: loginEmail,
-          subject: '✅ Tu solicitud fue aprobada – SisPasantías',
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-              <h2 style="color:#0073AD">¡Tu solicitud fue aprobada! 🎉</h2>
-              <p>Hola, <strong>${nombreResponsable}</strong>.</p>
-              <p>El equipo de <strong>SisPasantías</strong> aprobó la solicitud de
-              <strong>${solicitud.razonSocial}</strong>. Ya podés acceder al panel
-              de empresa con las siguientes credenciales:</p>
-              <table style="margin:1rem 0;border-collapse:collapse;width:100%">
-                <tr>
-                  <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px;border-radius:6px 0 0 6px">Email</td>
-                  <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0">${loginEmail}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 12px;background:#f0f6fc;font-weight:600;margin-top:4px;border-radius:6px 0 0 6px">Contraseña</td>
-                  <td style="padding:8px 12px;background:#e8f4fb;border-radius:0 6px 6px 0;font-family:monospace;font-size:1.1rem;letter-spacing:0.05em">${passwordPlano}</td>
-                </tr>
-              </table>
-              <p style="color:#c0392b;font-size:0.88rem">⚠️ Por seguridad, te recomendamos cambiar la contraseña al iniciar sesión por primera vez.</p>
-              <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
-                Ingresar al sistema
-              </a>
-              ${reclutadoresSolicitud.length > 0 ? `<p style="margin-top:1.5rem;font-size:0.88rem;color:#444">Se crearon ${reclutadoresSolicitud.length} solicitud(es) de reclutador pendientes de aprobación.</p>` : ''}
-              <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
-            </div>
-          `,
-        });
-      } catch (emailErr) {
-        console.error('[Admin] Error enviando email de aprobación:', emailErr.message);
-      }
-
-      return res.json({
-        success: true,
-        message: `Solicitud aprobada. Empresa "${solicitud.razonSocial}" y usuario creados. Credenciales enviadas a ${loginEmail}.`,
-        data: {
-          empresaId: nuevaEmpresa.id,
-          usuarioId: nuevoUsuario.id,
-          email:     loginEmail,
-          reclutadoresPendientes: reclutadoresSolicitud.length,
-          ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: passwordPlano }),
-        },
-      });
-    } catch (err) {
-      await t.rollback();
-      throw err;
-    }
+    const resultado = await solicitudEmpresaService.aprobarSolicitud(
+      req.params.id,
+      { adminUsuarioId: req.usuario.id, ip: req.ip }
+    );
+    return res.json({
+      success: true,
+      message: `Solicitud aprobada. Empresa "${resultado.razonSocial}" y usuario creados. Credenciales enviadas a ${resultado.email}.`,
+      data: {
+        empresaId:             resultado.empresaId,
+        usuarioId:             resultado.usuarioId,
+        email:                 resultado.email,
+        reclutadoresPendientes: resultado.reclutadoresPendientes,
+        ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: resultado.passwordGenerada }),
+      },
+    });
   } catch (err) {
+    if (err.statusCode) {
+      const resp = { success: false, message: err.message };
+      if (err.code) resp.code = err.code;
+      return res.status(err.statusCode).json(resp);
+    }
     console.error('[Admin] Error al aprobar solicitud:', err);
     return res.status(500).json({ success: false, message: 'Error al aprobar la solicitud.' });
   }
 });
 
-/**
- * PATCH /api/admin/solicitudes-empresa/:id/rechazar
- *
- * Cambia el estado a "rechazado" y notifica a la empresa por email.
- * Body opcional: { motivo } — razón del rechazo (se incluye en el email)
- */
 router.patch('/solicitudes-empresa/:id/rechazar', ...soloAdmin, async (req, res) => {
   try {
-    const solicitud = await SolicitudEmpresa.findByPk(req.params.id);
-    if (!solicitud) return res.status(404).json({ success: false, message: 'Solicitud no encontrada.' });
-    if (solicitud.estado !== 'pendiente') {
-      return res.status(400).json({ success: false, message: `La solicitud ya fue ${solicitud.estado}.` });
-    }
-
-    const { motivo } = req.body;
-    await solicitud.update({ estado: 'rechazado' });
-
-    await logAction({
-      usuarioId: req.usuario.id,
-      accion:    'rechazar_solicitud_empresa',
-      entidad:   'solicitud_empresa',
-      entidadId: solicitud.id,
-      detalle:   { razonSocial: solicitud.razonSocial, email: solicitud.email, motivo },
-      ip:        req.ip,
-    });
-
-    // Notificar por email
-    try {
-      await enviarEmail({
-        to: solicitud.email,
-        subject: '❌ Tu solicitud no fue aprobada – SisPasantías',
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-            <h2 style="color:#c0392b">Solicitud no aprobada</h2>
-            <p>Hola, <strong>${solicitud.razonSocial}</strong>.</p>
-            <p>Luego de revisar tu solicitud de registro en <strong>SisPasantías</strong>,
-            lamentablemente no pudimos aprobarla en esta oportunidad.</p>
-            ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
-            <p>Si considerás que fue un error o querés más información, podés comunicarte
-            directamente con el equipo del instituto.</p>
-            <p style="margin-top:2rem;color:#888;font-size:0.82rem">SisPasantías – Portal Institucional de Empleo</p>
-          </div>
-        `,
-      });
-    } catch (emailErr) {
-      console.error('[Admin] Error enviando email de rechazo:', emailErr.message);
-    }
-
+    await solicitudEmpresaService.rechazarSolicitud(
+      req.params.id,
+      { adminUsuarioId: req.usuario.id, ip: req.ip },
+      req.body.motivo
+    );
     return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada por email.' });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, message: err.message });
     console.error('[Admin] Error al rechazar solicitud:', err);
     return res.status(500).json({ success: false, message: 'Error al rechazar la solicitud.' });
   }
@@ -916,181 +708,42 @@ router.get('/solicitudes-reclutador', ...soloAdmin, async (req, res) => {
   }
 });
 
-/**
- * PATCH /api/admin/solicitudes-reclutador/:id/aprobar
- * Aprueba una solicitud de reclutador:
- *  1. Crea el usuario con rol 'empresa'
- *  2. Lo asocia a la empresa en EmpresaUsuario (rol reclutador)
- *  3. Envía email con credenciales al reclutador
- *  4. Envía notificación a la empresa (email al propietario)
- */
 router.patch('/solicitudes-reclutador/:id/aprobar', ...soloAdmin, async (req, res) => {
-  const t = await sequelize.transaction();
   try {
-    const solicitud = await SolicitudReclutador.findByPk(req.params.id, {
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
-      transaction: t,
-    });
-    if (!solicitud) { await t.rollback(); return res.status(404).json({ success: false, message: 'Solicitud no encontrada.' }); }
-    if (solicitud.estado !== 'pendiente') { await t.rollback(); return res.status(400).json({ success: false, message: `La solicitud ya fue ${solicitud.estado}.` }); }
-
-    // Verificar duplicado de email
-    const emailExistente = await Usuario.findOne({ where: { email: solicitud.email }, transaction: t });
-    if (emailExistente) {
-      await t.rollback();
-      return res.status(400).json({
-        success: false,
-        message: `El email ${solicitud.email} ya tiene una cuenta registrada en el sistema. Verificá si el reclutador ya fue aprobado anteriormente.`,
-        code: 'EMAIL_DUPLICADO',
-      });
-    }
-
-    // Generar credenciales
-    const passwordPlano = crypto.randomBytes(6).toString('hex');
-    const hash = await bcrypt.hash(passwordPlano, 12);
-
-    // Crear usuario con rol empresa usando datos reales del reclutador
-    const nuevoUsuario = await Usuario.create({
-      nombre:   solicitud.nombre,
-      apellido: solicitud.apellido?.trim() || 'S/D',
-      email:    solicitud.email,
-      password: hash,
-      rol: 'empresa',
-      activo: true,
-      habilitado: true,
-    }, { transaction: t });
-
-    // Asociar a la empresa
-    await EmpresaUsuario.create({
-      empresaId: solicitud.empresaId,
-      usuarioId: nuevoUsuario.id,
-      rolInterno: 'reclutador',
-      activo: true,
-    }, { transaction: t });
-
-    await solicitud.update({ estado: 'aprobado' }, { transaction: t });
-    await t.commit();
-
-    await logAction({ usuarioId: req.usuario.id, accion: 'aprobar_solicitud_reclutador', entidad: 'solicitud_reclutador', entidadId: solicitud.id, detalle: { email: solicitud.email, empresaId: solicitud.empresaId }, ip: req.ip });
-
-    // Notificación in-app al admin_empresa de la empresa
-    try {
-      const empresaOwner = solicitud.empresa?.usuarioId;
-      if (empresaOwner) {
-        await crearNotificacion({
-          usuarioId: empresaOwner,
-          titulo: '✅ Solicitud de reclutador aprobada',
-          mensaje: `${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} ya puede acceder al sistema como reclutador.`,
-          tipo: 'sistema',
-          tipoVisual: 'success',
-          enlace: '/empresa/equipo',
-          accionURL: '/empresa/equipo',
-        });
-      }
-    } catch (e) { console.error('[Admin] Error notif aprobación reclutador:', e.message); }
-
-    const loginUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`;
-
-    // Email al reclutador con credenciales
-    try {
-      await enviarEmail({
-        to: solicitud.email,
-        subject: '✅ Tu cuenta de reclutador fue creada – SisPasantías',
-        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-          <h2 style="color:#0073AD">¡Tu cuenta fue creada! 🎉</h2>
-          <p>Hola, <strong>${solicitud.nombre}</strong>.</p>
-          <p>El equipo de <strong>SisPasantías</strong> activó tu cuenta de reclutador en <strong>${solicitud.empresa?.razonSocial}</strong>.</p>
-          <table style="margin:1rem 0;border-collapse:collapse;width:100%">
-            <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600;width:130px">Email</td><td style="padding:8px 12px;background:#e8f4fb">${solicitud.email}</td></tr>
-            <tr><td style="padding:8px 12px;background:#f0f6fc;font-weight:600">Contraseña</td><td style="padding:8px 12px;background:#e8f4fb;font-family:monospace;font-size:1.1rem">${passwordPlano}</td></tr>
-          </table>
-          <p style="color:#c0392b;font-size:0.88rem">⚠️ Cambiá tu contraseña al ingresar por primera vez.</p>
-          <a href="${loginUrl}" style="display:inline-block;margin-top:1rem;background:#0073AD;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Ingresar al sistema</a>
-        </div>`,
-      });
-    } catch (e) { console.error('[Admin] Email reclutador aprobado:', e.message); }
-
-    // Notificación email al propietario de la empresa
-    try {
-      const propietario = await Usuario.findByPk(solicitud.empresa?.usuarioId);
-      if (propietario) {
-        await enviarEmail({
-          to: propietario.email,
-          subject: '✅ Solicitud de reclutador aprobada – SisPasantías',
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-            <h2 style="color:#0073AD">Solicitud aprobada</h2>
-            <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>aprobada</strong>.</p>
-            <p>El reclutador ya puede acceder al sistema con las credenciales enviadas a su email.</p>
-          </div>`,
-        });
-      }
-    } catch (e) { console.error('[Admin] Email notif empresa aprobado:', e.message); }
-
+    const resultado = await solicitudReclutadorService.aprobarSolicitud(
+      req.params.id,
+      { adminUsuarioId: req.usuario.id, ip: req.ip }
+    );
     return res.json({
       success: true,
-      message: `Reclutador aprobado. Cuenta creada para ${solicitud.email}.`,
-      data: { usuarioId: nuevoUsuario.id, email: solicitud.email, ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: passwordPlano }) },
+      message: `Reclutador aprobado. Cuenta creada para ${resultado.email}.`,
+      data: {
+        usuarioId: resultado.usuarioId,
+        email:     resultado.email,
+        ...(process.env.NODE_ENV !== 'production' && { passwordGenerada: resultado.passwordGenerada }),
+      },
     });
   } catch (err) {
-    await t.rollback();
+    if (err.statusCode) {
+      const resp = { success: false, message: err.message };
+      if (err.code) resp.code = err.code;
+      return res.status(err.statusCode).json(resp);
+    }
     console.error('[Admin] Error al aprobar solicitud-reclutador:', err);
     return res.status(500).json({ success: false, message: 'Error al aprobar la solicitud.' });
   }
 });
 
-/**
- * PATCH /api/admin/solicitudes-reclutador/:id/rechazar
- * Rechaza la solicitud y notifica a la empresa y al solicitante.
- * Body opcional: { motivo }
- */
 router.patch('/solicitudes-reclutador/:id/rechazar', ...soloAdmin, async (req, res) => {
   try {
-    const solicitud = await SolicitudReclutador.findByPk(req.params.id, {
-      include: [{ model: Empresa, as: 'empresa', attributes: ['id', 'razonSocial', 'usuarioId'] }],
-    });
-    if (!solicitud) return res.status(404).json({ success: false, message: 'Solicitud no encontrada.' });
-    if (solicitud.estado !== 'pendiente') return res.status(400).json({ success: false, message: `La solicitud ya fue ${solicitud.estado}.` });
-
-    const { motivo } = req.body;
-    await solicitud.update({ estado: 'rechazado', motivoRechazo: motivo || null });
-
-    await logAction({ usuarioId: req.usuario.id, accion: 'rechazar_solicitud_reclutador', entidad: 'solicitud_reclutador', entidadId: solicitud.id, detalle: { email: solicitud.email, motivo }, ip: req.ip });
-
-    // Notificación in-app al admin_empresa
-    try {
-      const empresaOwner = solicitud.empresa?.usuarioId;
-      if (empresaOwner) {
-        await crearNotificacion({
-          usuarioId: empresaOwner,
-          titulo: '❌ Solicitud de reclutador rechazada',
-          mensaje: `La solicitud para ${solicitud.nombre}${solicitud.apellido ? ' ' + solicitud.apellido : ''} (${solicitud.email}) no fue aprobada.${motivo ? ` Motivo: ${motivo}` : ''}`,
-          tipo: 'sistema',
-          tipoVisual: 'error',
-          enlace: '/empresa/equipo',
-          accionURL: '/empresa/equipo',
-        });
-      }
-    } catch (e) { console.error('[Admin] Error notif rechazo reclutador:', e.message); }
-
-    // Notificar a la empresa (propietario) por email
-    try {
-      const propietario = await Usuario.findByPk(solicitud.empresa?.usuarioId);
-      if (propietario) {
-        await enviarEmail({
-          to: propietario.email,
-          subject: '❌ Solicitud de reclutador rechazada – SisPasantías',
-          html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#222">
-            <h2 style="color:#c0392b">Solicitud rechazada</h2>
-            <p>La solicitud de reclutador para <strong>${solicitud.nombre}</strong> (${solicitud.email}) fue <strong>rechazada</strong>.</p>
-            ${motivo ? `<p><strong>Motivo:</strong> ${motivo}</p>` : ''}
-            <p>Si tenés consultas, contactate con el equipo del instituto.</p>
-          </div>`,
-        });
-      }
-    } catch (e) { console.error('[Admin] Email notif empresa rechazado:', e.message); }
-
+    await solicitudReclutadorService.rechazarSolicitud(
+      req.params.id,
+      { adminUsuarioId: req.usuario.id, ip: req.ip },
+      req.body.motivo
+    );
     return res.json({ success: true, message: 'Solicitud rechazada. Notificación enviada a la empresa.' });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, message: err.message });
     console.error('[Admin] Error al rechazar solicitud-reclutador:', err);
     return res.status(500).json({ success: false, message: 'Error al rechazar la solicitud.' });
   }

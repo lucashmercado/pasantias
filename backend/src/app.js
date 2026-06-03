@@ -13,6 +13,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+const errorMiddleware = require('./middleware/error.middleware');
+
 const app = express();
 
 // ── Configuración de CORS ─────────────────────────────────────────────────────
@@ -67,13 +69,6 @@ app.use('/api/solicitudes-empresa', require('./routes/solicitudEmpresa.routes'))
 app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
 // ── Manejador global de errores ───────────────────────────────────────────────
-// Captura cualquier error no manejado en las rutas y devuelve una respuesta JSON limpia
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Error interno del servidor',
-  });
-});
+app.use(errorMiddleware);
 
 module.exports = app;
