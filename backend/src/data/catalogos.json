@@ -1,0 +1,161 @@
+{
+  "areas": [
+    "Desarrollo Web",
+    "Programación",
+    "Redes y Telecomunicaciones",
+    "Ciberseguridad",
+    "Electrónica",
+    "Automatización y Control",
+    "Mecánica",
+    "Administración",
+    "Contabilidad",
+    "Logística",
+    "Marketing",
+    "Diseño Industrial"
+  ],
+  "habilidadesPorArea": {
+    "Desarrollo Web": [
+      "HTML",
+      "CSS",
+      "JavaScript",
+      "React",
+      "Git",
+      "Responsive Design",
+      "APIs REST"
+    ],
+    "Programación": [
+      "Lógica",
+      "Node.js",
+      "SQL",
+      "Python",
+      "Git",
+      "Java",
+      "Testing"
+    ],
+    "Redes y Telecomunicaciones": [
+      "TCP/IP",
+      "Routing",
+      "Switching",
+      "Mikrotik",
+      "Wireshark",
+      "VLAN",
+      "Cableado estructurado"
+    ],
+    "Ciberseguridad": [
+      "OWASP",
+      "Hardening",
+      "SIEM",
+      "Análisis de logs",
+      "Linux",
+      "Pentesting básico",
+      "Gestión de incidentes"
+    ],
+    "Electrónica": [
+      "PLC",
+      "Sensores",
+      "Instrumentación",
+      "Soldadura",
+      "Lectura de planos",
+      "Multímetro",
+      "Mantenimiento electrónico"
+    ],
+    "Automatización y Control": [
+      "PLC",
+      "SCADA",
+      "PID",
+      "Electricidad Industrial",
+      "Mantenimiento",
+      "Tableros eléctricos",
+      "HMI"
+    ],
+    "Mecánica": [
+      "AutoCAD",
+      "Metrología",
+      "Mantenimiento",
+      "Neumática",
+      "Hidráulica",
+      "Interpretación de planos",
+      "SolidWorks"
+    ],
+    "Administración": [
+      "Excel",
+      "Gestión documental",
+      "ERP",
+      "Comunicación",
+      "Organización",
+      "Atención al cliente",
+      "Reportes"
+    ],
+    "Contabilidad": [
+      "Excel",
+      "Conciliación",
+      "Impuestos básicos",
+      "Sistemas contables",
+      "Análisis",
+      "Facturación",
+      "Cuentas corrientes"
+    ],
+    "Logística": [
+      "Inventario",
+      "WMS",
+      "Excel",
+      "Planificación",
+      "Trazabilidad",
+      "Picking",
+      "Distribución"
+    ],
+    "Marketing": [
+      "Redes sociales",
+      "Canva",
+      "Métricas",
+      "Copywriting",
+      "Google Ads",
+      "Meta Ads",
+      "Email marketing"
+    ],
+    "Diseño Industrial": [
+      "CAD",
+      "Modelado 3D",
+      "Planos técnicos",
+      "Materiales",
+      "Prototipado",
+      "Renderizado",
+      "Diseño de producto"
+    ]
+  },
+  "carreras": [
+    "Tecnicatura Superior en Programación",
+    "Tecnicatura en Redes y Telecomunicaciones",
+    "Tecnicatura en Ciberseguridad",
+    "Tecnicatura en Electrónica",
+    "Tecnicatura en Automatización y Control",
+    "Tecnicatura en Mecánica",
+    "Tecnicatura en Administración",
+    "Tecnicatura en Contabilidad",
+    "Tecnicatura en Logística",
+    "Tecnicatura en Marketing",
+    "Tecnicatura en Diseño Industrial"
+  ],
+  "rubroACarreras": {
+    "Software": ["Tecnicatura Superior en Programación"],
+    "Analítica de Datos": ["Tecnicatura Superior en Programación"],
+    "Infraestructura Cloud": ["Tecnicatura en Redes y Telecomunicaciones", "Tecnicatura Superior en Programación"],
+    "Fintech": ["Tecnicatura Superior en Programación", "Tecnicatura en Administración"],
+    "Telecomunicaciones": ["Tecnicatura en Redes y Telecomunicaciones"],
+    "Ciberseguridad": ["Tecnicatura en Ciberseguridad", "Tecnicatura en Redes y Telecomunicaciones"],
+    "Electrónica Industrial": ["Tecnicatura en Electrónica", "Tecnicatura en Automatización y Control"],
+    "Automatización y Control": ["Tecnicatura en Automatización y Control", "Tecnicatura en Mecánica"],
+    "Mecánica y Mantenimiento": ["Tecnicatura en Mecánica"],
+    "Manufactura y Automatización": ["Tecnicatura en Automatización y Control", "Tecnicatura en Mecánica"],
+    "Administración Empresarial": ["Tecnicatura en Administración"],
+    "Servicios Contables": ["Tecnicatura en Contabilidad", "Tecnicatura en Administración"],
+    "Logística": ["Tecnicatura en Logística"],
+    "Logística Sustentable": ["Tecnicatura en Logística", "Tecnicatura en Administración"],
+    "Marketing Digital": ["Tecnicatura en Marketing"],
+    "Diseño Industrial": ["Tecnicatura en Diseño Industrial"],
+    "Software para Salud": ["Tecnicatura Superior en Programación"],
+    "Soporte IT y Redes": ["Tecnicatura en Redes y Telecomunicaciones", "Tecnicatura en Ciberseguridad"],
+    "Metalúrgica": ["Tecnicatura en Mecánica", "Tecnicatura en Electrónica"],
+    "Sistemas de Gestión": ["Tecnicatura Superior en Programación", "Tecnicatura en Administración"]
+  }
+}
