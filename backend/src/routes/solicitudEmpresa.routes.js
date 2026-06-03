@@ -9,9 +9,10 @@
 
 'use strict';
 const router = require('express').Router();
+const validate = require('../middleware/validate.middleware');
+const { validateCrearSolicitud } = require('../validators/solicitudEmpresa.validator');
 const { crearSolicitud } = require('../controllers/solicitudEmpresa.controller');
 
-// Ruta pública: cualquier interesado puede enviar su solicitud de registro
-router.post('/', crearSolicitud);
+router.post('/', validate(validateCrearSolicitud), crearSolicitud);
 
 module.exports = router;

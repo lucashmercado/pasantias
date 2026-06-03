@@ -231,27 +231,6 @@ exports.cambiarPassword = async (req, res) => {
   try {
     const { passwordActual, nuevaPassword } = req.body;
 
-    if (!passwordActual || !nuevaPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Debés proporcionar la contraseña actual y la nueva contraseña.',
-      });
-    }
-
-    if (nuevaPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'La nueva contraseña debe tener al menos 6 caracteres.',
-      });
-    }
-
-    if (passwordActual === nuevaPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'La nueva contraseña debe ser diferente a la actual.',
-      });
-    }
-
     const usuario = await Usuario.findByPk(req.usuario.id);
     if (!usuario) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
