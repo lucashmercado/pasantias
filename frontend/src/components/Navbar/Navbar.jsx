@@ -11,6 +11,19 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+
+function NavbarAvatar({ fotoPerfil, nombre, avatarClass, imgClass }) {
+  const [imgError, setImgError] = useState(false);
+  const inicial = (nombre?.[0] ?? '?').toUpperCase();
+  return (
+    <div className={avatarClass}>
+      {fotoPerfil && !imgError
+        ? <img src={fotoPerfil} alt={nombre} className={imgClass} onError={() => setImgError(true)} />
+        : inicial
+      }
+    </div>
+  );
+}
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { notificacionService, mensajeService } from '../../services/api';
@@ -181,17 +194,12 @@ export default function Navbar() {
             aria-expanded={menuOpen}
           >
             {/* Avatar */}
-            <div className={styles.avatar}>
-              {usuario.fotoPerfil ? (
-                <img
-                  src={usuario.fotoPerfil}
-                  alt={usuario.nombre}
-                  className={styles.avatarImg}
-                />
-              ) : (
-                usuario.nombre?.[0]?.toUpperCase()
-              )}
-            </div>
+            <NavbarAvatar
+              fotoPerfil={usuario.fotoPerfil}
+              nombre={usuario.nombre}
+              avatarClass={styles.avatar}
+              imgClass={styles.avatarImg}
+            />
             <span className={styles.userName}>{usuario.nombre}</span>
             <span className={styles.arrow}>{menuOpen ? '▴' : '▾'}</span>
 

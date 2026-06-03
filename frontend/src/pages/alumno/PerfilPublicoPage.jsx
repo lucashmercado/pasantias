@@ -9,10 +9,29 @@
  * salario pretendido, preferencias laborales). Respeta visibilidadPerfil.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/api';
+
+/** Avatar con foto o inicial como fallback. onError evita mostrar imágenes rotas. */
+function AvatarFoto({ fotoSrc, nombre, size = 48, borderRadius = '50%', fontSize = '1.25rem' }) {
+  const [error, setError] = useState(false);
+  const inicial = (nombre?.[0] ?? '?').toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius,
+      background: 'var(--primary)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', fontSize, color: '#fff',
+      flexShrink: 0, overflow: 'hidden',
+    }}>
+      {fotoSrc && !error
+        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setError(true)} />
+        : inicial
+      }
+    </div>
+  );
+}
 
 const DISPONIBILIDAD_LABEL = {
   inmediata:     'Disponibilidad inmediata',
@@ -68,6 +87,8 @@ export default function PerfilPublicoPage() {
   const { perfil } = data;
   const puedeContactar = usuario?.id !== Number(usuarioId) && usuario?.rol !== 'admin';
   const rolLabel = data.rol === 'egresado' ? 'Egresado' : 'Alumno';
+  // Priorizar foto de perfil (perfiles.fotoPerfil), fallback a usuarios.fotoPerfil
+  const fotoSrc = perfil?.fotoPerfil || data.fotoPerfil || null;
 
   return (
     <div className="page-container">
@@ -80,17 +101,13 @@ export default function PerfilPublicoPage() {
         marginBottom: '1.5rem', flexWrap: 'wrap',
       }}>
         {/* Avatar */}
-        <div style={{
-          width: 80, height: 80, borderRadius: '50%',
-          background: 'var(--primary)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: '2rem', color: '#fff',
-          flexShrink: 0, overflow: 'hidden',
-        }}>
-          {data.fotoPerfil
-            ? <img src={data.fotoPerfil} alt={data.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : data.nombre?.[0]?.toUpperCase()
-          }
-        </div>
+        <AvatarFoto
+          fotoSrc={fotoSrc}
+          nombre={data.nombre}
+          size={80}
+          borderRadius="50%"
+          fontSize="2rem"
+        />
 
         {/* Info principal */}
         <div style={{ flex: 1, minWidth: 200 }}>

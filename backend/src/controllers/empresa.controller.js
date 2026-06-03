@@ -20,7 +20,7 @@
 
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { Empresa, EmpresaUsuario, Usuario, Oferta, Postulacion, SolicitudReclutador } = require('../models');
+const { Empresa, EmpresaUsuario, Usuario, Oferta, Postulacion, Perfil, SolicitudReclutador } = require('../models');
 const { Op } = require('sequelize');
 
 
@@ -253,7 +253,29 @@ exports.getAllCandidatos = async (req, res) => {
       order: [['updatedAt', 'DESC']],
     });
 
-    return res.json({ success: true, total: postulaciones.length, data: postulaciones });
+    // Batch fallback de fotoPerfil desde perfiles para usuarios sin foto en la tabla usuarios
+    const usuariosSinFoto = [...new Set(
+      postulaciones.filter(p => p.usuario?.id && !p.usuario.fotoPerfil).map(p => p.usuario.id)
+    )];
+
+    const fotoMap = {};
+    if (usuariosSinFoto.length > 0) {
+      const perfiles = await Perfil.findAll({
+        where: { usuarioId: { [Op.in]: usuariosSinFoto }, fotoPerfil: { [Op.ne]: null } },
+        attributes: ['usuarioId', 'fotoPerfil'],
+      });
+      perfiles.forEach(p => { fotoMap[p.usuarioId] = p.fotoPerfil; });
+    }
+
+    const data = postulaciones.map(p => {
+      const plain = p.toJSON();
+      if (plain.usuario && !plain.usuario.fotoPerfil) {
+        plain.usuario.fotoPerfil = fotoMap[plain.usuario.id] ?? null;
+      }
+      return plain;
+    });
+
+    return res.json({ success: true, total: data.length, data });
   } catch (error) {
     console.error('Error en getAllCandidatos:', error);
     return res.status(500).json({ success: false, message: 'Error al obtener candidatos.' });

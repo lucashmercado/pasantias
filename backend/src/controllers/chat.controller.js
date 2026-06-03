@@ -20,12 +20,29 @@
 
 'use strict';
 
-const { Mensaje, Usuario, Postulacion, Oferta, Empresa, EmpresaUsuario } = require('../models');
+const { Mensaje, Usuario, Postulacion, Oferta, Empresa, EmpresaUsuario, Perfil } = require('../models');
 const { Op } = require('sequelize');
 const { crearNotificacion } = require('../utils/notificador');
 
 // Estados de postulación relevantes (usados como contexto para "Contactar", no como requisito de chat)
 const ESTADOS_CHAT_HABILITADO = ['preseleccionado', 'entrevista_programada', 'entrevista', 'contratado'];
+
+/**
+ * Resuelve fotoPerfil desde la tabla perfiles para una lista de usuarioIds.
+ * Usado como fallback cuando usuarios.fotoPerfil está vacío (usuarios anteriores a la sincronización).
+ * @param {number[]} usuarioIds
+ * @returns {Promise<Object>} map { usuarioId: fotoPerfil }
+ */
+async function resolverFotoPerfilBatch(usuarioIds) {
+  if (!usuarioIds?.length) return {};
+  const perfiles = await Perfil.findAll({
+    where: { usuarioId: { [Op.in]: usuarioIds }, fotoPerfil: { [Op.ne]: null } },
+    attributes: ['usuarioId', 'fotoPerfil'],
+  });
+  const map = {};
+  perfiles.forEach(p => { map[p.usuarioId] = p.fotoPerfil; });
+  return map;
+}
 
 /**
  * Resuelve razonSocial y empresaId de un usuario con rol 'empresa'.
@@ -183,7 +200,7 @@ exports.buscarUsuarios = async (req, res) => {
           rol:    { [Op.in]: ['alumno', 'egresado', 'empresa'] },
           ...filtroTexto,
         },
-        attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
         limit: 20,
         order: [['nombre', 'ASC'], ['apellido', 'ASC']],
       });
@@ -199,7 +216,7 @@ exports.buscarUsuarios = async (req, res) => {
           rol:    { [Op.in]: ['alumno', 'egresado'] },
           ...filtroTexto,
         },
-        attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+        attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
         limit: 15,
         order: [['nombre', 'ASC'], ['apellido', 'ASC']],
       });
@@ -231,7 +248,7 @@ exports.buscarUsuarios = async (req, res) => {
               activo: true,
               ...filtroTexto,
             },
-            attributes: ['id', 'nombre', 'apellido', 'email', 'rol'],
+            attributes: ['id', 'nombre', 'apellido', 'email', 'rol', 'fotoPerfil'],
             limit: 5,
             order: [['nombre', 'ASC'], ['apellido', 'ASC']],
           });
@@ -244,6 +261,13 @@ exports.buscarUsuarios = async (req, res) => {
     }
 
     const data = resultados.map(u => ({ ...u.toJSON(), razonSocial: null, empresaId: null }));
+
+    // Batch fallback de fotoPerfil desde perfiles para usuarios sin foto en la tabla usuarios
+    const sinFoto = data.filter(u => !u.fotoPerfil).map(u => u.id);
+    if (sinFoto.length > 0) {
+      const fotoMap = await resolverFotoPerfilBatch(sinFoto);
+      data.forEach(u => { if (!u.fotoPerfil) u.fotoPerfil = fotoMap[u.id] ?? null; });
+    }
 
     // Batch lookup de razonSocial + empresaId para usuarios empresa
     const empresaUserIds = data.filter(u => u.rol === 'empresa').map(u => u.id);
@@ -357,6 +381,15 @@ exports.getConversaciones = async (req, res) => {
       conversaciones.forEach(c => {
         c.usuario.razonSocial = empresaMap[c.usuario.id]?.razonSocial ?? null;
         c.usuario.empresaId   = empresaMap[c.usuario.id]?.empresaId   ?? null;
+      });
+    }
+
+    // Batch fallback de fotoPerfil desde perfiles para usuarios sin foto en la tabla usuarios
+    const sinFotoConv = conversaciones.filter(c => !c.usuario.fotoPerfil).map(c => c.usuario.id);
+    if (sinFotoConv.length > 0) {
+      const fotoMap = await resolverFotoPerfilBatch(sinFotoConv);
+      conversaciones.forEach(c => {
+        if (!c.usuario.fotoPerfil) c.usuario.fotoPerfil = fotoMap[c.usuario.id] ?? null;
       });
     }
 
@@ -505,6 +538,15 @@ exports.getHistorial = async (req, res) => {
     } else {
       partnerData.razonSocial = null;
       partnerData.empresaId   = null;
+    }
+
+    // Fallback de fotoPerfil desde perfiles si usuarios.fotoPerfil está vacío
+    if (!partnerData.fotoPerfil) {
+      const perfilFoto = await Perfil.findOne({
+        where: { usuarioId: partnerId },
+        attributes: ['fotoPerfil'],
+      });
+      partnerData.fotoPerfil = perfilFoto?.fotoPerfil ?? null;
     }
 
     const { count, rows: mensajes } = await Mensaje.findAndCountAll({

@@ -46,6 +46,20 @@ function formatFecha(iso) {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/* ── Avatar de candidato con foto o inicial ─────────────────────────────────── */
+function CandidatoAvatar({ fotoSrc, nombre, color }) {
+  const [error, setError] = useState(false);
+  const inicial = (nombre?.[0] ?? '?').toUpperCase();
+  return (
+    <div className={styles.candidatoAvatar} style={{ background: color, overflow: 'hidden' }}>
+      {fotoSrc && !error
+        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setError(true)} />
+        : inicial
+      }
+    </div>
+  );
+}
+
 /* ── Badge de aval ───────────────────────────────────────────────────────────── */
 function AvalBadge({ avales = [] }) {
   if (!avales?.length) return (
@@ -223,9 +237,11 @@ export default function PostulantesMiOfertaPage() {
                     {/* Info principal */}
                     <div className={styles.candidatoBody}>
                       <div className={styles.candidatoTop}>
-                        <div className={styles.candidatoAvatar} style={{ background: col?.color ?? '#64748b' }}>
-                          {(p.usuario?.nombre?.[0] ?? '?').toUpperCase()}
-                        </div>
+                        <CandidatoAvatar
+                          fotoSrc={p.usuario?.perfil?.fotoPerfil ?? p.usuario?.fotoPerfil}
+                          nombre={p.usuario?.nombre}
+                          color={col?.color ?? '#64748b'}
+                        />
                         <div className={styles.candidatoInfo}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>

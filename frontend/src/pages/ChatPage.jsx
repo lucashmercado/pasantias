@@ -59,14 +59,19 @@ function displayNombre(usuario) {
   return nombre;
 }
 
-/** Avatar circular con inicial */
-function Avatar({ nombre, size = 36, color = 'var(--primary)' }) {
+/** Avatar circular con foto o inicial como fallback. onError evita imágenes rotas. */
+function Avatar({ nombre, fotoUrl, size = 36, color = 'var(--primary)' }) {
+  const [imgError, setImgError] = useState(false);
+  const inicial = (nombre?.[0] ?? '?').toUpperCase();
   return (
     <div
       className={styles.avatar}
-      style={{ width: size, height: size, minWidth: size, background: color, fontSize: size * 0.38 }}
+      style={{ width: size, height: size, minWidth: size, background: color, fontSize: size * 0.38, overflow: 'hidden' }}
     >
-      {(nombre?.[0] ?? '?').toUpperCase()}
+      {fotoUrl && !imgError
+        ? <img src={fotoUrl} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setImgError(true)} />
+        : inicial
+      }
     </div>
   );
 }
@@ -85,7 +90,7 @@ function ConversacionItem({ conv, activo, onClick }) {
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
-      <Avatar nombre={conv.usuario?.nombre} color={activo ? '#fff' : 'var(--primary)'} />
+      <Avatar nombre={conv.usuario?.nombre} fotoUrl={conv.usuario?.fotoPerfil} color={activo ? '#fff' : 'var(--primary)'} />
       <div className={styles.convInfo}>
         <div className={styles.convNombreRow}>
           <strong className={styles.convNombre}>
@@ -113,7 +118,7 @@ function BurbujaMensaje({ mensaje, esMio }) {
   return (
     <div className={`${styles.burbujaWrap} ${esMio ? styles.burbujaWrapMia : ''}`}>
       {!esMio && (
-        <Avatar nombre={mensaje.emisor?.nombre} size={30} />
+        <Avatar nombre={mensaje.emisor?.nombre} fotoUrl={mensaje.emisor?.fotoPerfil} size={30} />
       )}
       <div className={`${styles.burbuja} ${esMio ? styles.burbujaMia : styles.burbujaSuya}`}>
         <p>{mensaje.mensaje ?? mensaje.contenido}</p>
@@ -469,7 +474,7 @@ export default function ChatPage() {
                 >
                   ←
                 </button>
-                <Avatar nombre={partnerActivo?.nombre} size={36} />
+                <Avatar nombre={partnerActivo?.nombre} fotoUrl={partnerActivo?.fotoPerfil} size={36} />
                 <div className={styles.chatHeaderInfo}>
                   <strong>
                     {loadingMensajes && !partnerActivo

@@ -12,6 +12,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { empresaService } from '../../services/api';
 
+function MiniAvatar({ fotoSrc, nombre }) {
+  const [error, setError] = useState(false);
+  const inicial = (nombre?.[0] ?? '?').toUpperCase();
+  return (
+    <div style={{
+      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+      background: 'var(--primary)', display: 'inline-flex', alignItems: 'center',
+      justifyContent: 'center', color: '#fff', fontSize: '0.85rem', fontWeight: 700,
+      overflow: 'hidden', verticalAlign: 'middle', marginRight: '0.5rem',
+    }}>
+      {fotoSrc && !error
+        ? <img src={fotoSrc} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={() => setError(true)} />
+        : inicial
+      }
+    </div>
+  );
+}
+
 const ESTADOS_TABS = [
   { value: '',             label: 'Todos' },
   { value: 'en_revision',  label: 'En revisión' },
@@ -127,7 +145,8 @@ export default function CandidatosEmpresaPage() {
             <tbody>
               {candidatos.map(p => (
                 <tr key={p.id}>
-                  <td>
+                  <td style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'nowrap' }}>
+                    <MiniAvatar fotoSrc={p.usuario?.fotoPerfil} nombre={p.usuario?.nombre} />
                     {p.usuario?.id ? (
                       <Link to={`/perfil/${p.usuario.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>
                         <strong>{p.usuario?.nombre} {p.usuario?.apellido}</strong>

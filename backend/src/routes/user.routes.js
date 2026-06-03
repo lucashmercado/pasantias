@@ -140,6 +140,11 @@ router.put('/perfil', verifyToken, authorizeRoles('alumno', 'egresado'), async (
 
     await Perfil.update(datosLimpios, { where: { usuarioId: req.usuario.id } });
 
+    // Sincronizar fotoPerfil al modelo Usuario para que el auth context y Navbar la muestren
+    if (datosLimpios.fotoPerfil !== undefined) {
+      await Usuario.update({ fotoPerfil: datosLimpios.fotoPerfil || null }, { where: { id: req.usuario.id } });
+    }
+
     // Devolver el perfil actualizado junto con telefono/ubicacion del Usuario
     const perfil = await Perfil.findOne({ where: { usuarioId: req.usuario.id } });
     const usuarioActualizado = await Usuario.findByPk(req.usuario.id, {
@@ -198,6 +203,7 @@ router.get('/:id/perfil', verifyToken, async (req, res) => {
     const perfil = await Perfil.findOne({
       where: { usuarioId: req.params.id },
       attributes: [
+        'fotoPerfil',
         'carrera', 'anioEgreso', 'descripcion', 'habilidades', 'idiomas',
         'certificaciones', 'linkedin', 'github', 'portfolio', 'cvPath',
         'areaInteres', 'disponibilidad', 'experienciaLaboral', 'proyectos',
