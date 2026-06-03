@@ -40,8 +40,8 @@ async function logAction(datos) {
  * Validaciones (en orden de ejecución):
  * 1. El alumno debe tener un CV cargado en su perfil
  * 2. No puede postularse dos veces a la misma oferta
- * 3. La oferta debe existir, estar activa Y haber sido moderada por el admin
- *    (no se puede postular a ofertas cerradas, pausadas o pendientes)
+ * 3. La oferta debe existir y estar en estado 'activa'
+ *    (moderada=false solo significa "pendiente de revisión admin", no bloquea postulación)
  *
  * Efecto secundario: genera una notificación para la empresa.
  */
@@ -79,14 +79,17 @@ exports.postular = async (req, res) => {
     if (!oferta) {
       return res.status(404).json({ success: false, message: 'Oferta no encontrada.', code: 'OFERTA_NOT_FOUND' });
     }
-    if (oferta.estado === 'cerrada') {
-      return res.status(400).json({ success: false, message: 'Esta oferta ya está cerrada.', code: 'OFERTA_CERRADA' });
-    }
-    if (oferta.estado === 'pausada') {
-      return res.status(400).json({ success: false, message: 'Esta oferta está pausada temporalmente.', code: 'OFERTA_PAUSADA' });
-    }
-    if (!oferta.moderada) {
-      return res.status(400).json({ success: false, message: 'Esta oferta no está disponible.', code: 'OFERTA_NO_DISPONIBLE' });
+    if (oferta.estado !== 'activa') {
+      const mensajes = {
+        pausada:   'Esta oferta está pausada temporalmente.',
+        rechazada: 'Esta oferta no está disponible.',
+        cerrada:   'Esta oferta ya está cerrada.',
+      };
+      return res.status(400).json({
+        success: false,
+        message: mensajes[oferta.estado] ?? 'Esta oferta no está disponible.',
+        code: 'OFERTA_NO_ACTIVA',
+      });
     }
 
     // Verifica fecha límite si está configurada
